@@ -1,5 +1,6 @@
 library(tidyverse)
 library(ggplot2)
+library(readxl)
 fert <- read_excel("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Fert-Yield data/Fertilizer Plans.xlsx",
 sheet = "Sheet1", col_types = c("numeric",
 "text", "date", "text", "numeric",
@@ -44,5 +45,3 @@ cp_n2o_1 <-  filter(flux_data,compound == "n2o", plot == "C" | plot == "P", flux
   group_by(field, plot) %>% 
   summarize(mean_flux = mean(flux), sd = sd(flux,na.rm = T), se = std.error(flux,na.rm = T))
 
-
-ggsave("n2o_flux_mean.png")

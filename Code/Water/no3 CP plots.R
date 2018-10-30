@@ -1,19 +1,26 @@
 library(ggplot2)
+library(plotrix)
+
 lys_data_CP <- filter(lys_data,compound == 'no3', treatment == 'C' | treatment == 'P', concentration > 0)
+
 all_n <- filter(lys_data, treatment == 'C' | treatment == 'P', concentration > 0)
+
 CP <- lys_data_CP %>% 
-  group_by(field, date, treatment) %>% 
+  group_by(field, treatment, date) %>% 
   summarise(mean_conc = mean(concentration,na.rm = T),
             total_conc = sum(concentration,na.rm = T),
             max_conc = max(concentration,na.rm = T),
-            sd = sd(concentration, na.rm = T))
+            sd = sd(concentration, na.rm = T)) %>% 
+  filter(mean_conc != "NA") %>% 
+  mutate(cs = cumsum(mean_conc))
+
+
 n <- all_n %>% 
   group_by(field, treatment, compound) %>% 
   summarise(sum = sum(concentration, na.rm = T), 
             sd = sd(concentration, na.rm = T),
             mean = mean(concentration, na.rm = T),
             se = std.error(concentration, na.rm = T))
-library(plotrix)
 n
 pd <- position_dodge(.9)
 pdd <- position_dodge2(.9)

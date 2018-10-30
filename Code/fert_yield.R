@@ -2,7 +2,8 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(readxl)
-total_fert<- read_excel("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Fert-Yield data/Fertilizer Plans.xlsx",
+#C:/Users/twilli2/
+total_fert<- read_excel("C:/Users/twilli2/Dropbox/Lab data/S Willamette GWMA Dropbox/Fert-Yield data/Fertilizer Plans.xlsx",
 sheet = "total fert")
  
 
@@ -10,7 +11,7 @@ yield_data <- as_tibble(c(1,2,3,4))
 yield_data$yield_kg <- (c(1586,2707,1995,1771))
 mutate(yield_data, yield_lb = yield_kg/1.12085)
 yield_data <- rename(yield_data, field = value)
-yield_data$total_n_lb<- c(155, 160, 204, 204)
+yield_data$total_n_lb<- c(155, 160, 232, 232)
 yield_data$plot <- c("C")
 yield_data1 <- yield_data
 yield_data2 <- yield_data
@@ -52,7 +53,7 @@ ggplot(data = total_fert) +
         panel.grid.minor = element_line(color = NA),
         panel.border = element_rect(fill = NA, color = "black"),
         strip.background = element_blank(),
-        axis.text.x  = element_text(size=12, colour="black", face = "bold", angle = 90),  
+        axis.text.x  = element_text(size=10, colour="black", face = "bold", angle = 90),  
         axis.title.x = element_text(vjust=-0.1, size = 14, face = "bold"),
         axis.text.y = element_text(size=14, colour="black"),
         axis.title.y = element_text(vjust=1.8, size = 14, face = "bold"),
