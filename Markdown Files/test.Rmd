@@ -1,0 +1,606 @@
+---
+title: "Flux Data Summary"
+author: "Trevor Williams"
+date: "September 4, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, conflicts = FALSE)
+```
+
+## N2O Flux Data
+
+This is a preliminary report on **N2O Flux Data** from the Willamette project. Many sources were referenced for the various tests employed including <https://rcompanion.org/handbook/index.html>. 
+
+This document will serve as a template for initial reporting of data from all fields and plots, including CO2 flux and water anlyses.
+
+```{r, echo=FALSE}
+
+# package and library load
+library(tidyverse)
+#import flux data
+flux_data <- read_csv("C:/Users/twilli2/Dropbox/Lab data/S Willamette GWMA Dropbox/Flux Data/Slopes and Flux CSV.csv",
+col_types = cols(chamber = col_character(),
+  compound = col_factor(levels = c("co2",
+"n2o")), date = col_datetime(format = "%m/%d/%Y"),
+field = col_factor(levels = c("1","2","3","4")), plot = col_factor(levels = c("0",
+"25", "50", "75", "100", "C",
+"P"))))
+.libPaths()
+#n2o flux data summary
+
+flux_data_n2o <- filter(flux_data, compound =="n2o")
+
+library(tidyverse)
+spread(flux_data, plot, flux) %>% 
+filter(compound == "n2o") %>% 
+summary()
+
+```
+```{r}
+#Conv VS EEF
+flux_data_n2o_cp <- filter(flux_data_n2o, plot == "C"| plot == "P") 
+
+ggplot(data = flux_data_n2o_cp, mapping = aes(x = flux))+
+  geom_histogram(binwidth = 0.5)
+
+ggplot(data = flux_data_n2o_cp, mapping = aes(x = flux, color = plot))+
+  geom_freqpoly(binwidth = 0.5)
+
+shapiro.test(flux_data_n2o_cp$flux)#null hyp = data from norm distribution. Rejected
+```
+Null hypothesis for Shapiro-Wilk test, that data are from a normal distribution is rejected.
+First lets focus on the the Conventional VS Precicion Agriculture or Enhanced Efficiency Fertilizer
+
+##Conv. VS P.A.
+
+```{r}
+ggplot(flux_data_n2o_cp, aes(x = plot, y = flux, color = plot)) +
+  geom_boxplot(outlier.alpha = 0.5, notch = T, varwidth = T, 
+               fill = "white", show.legend = T)+
+  labs(x = "Plot", y = "Flux (ng N/cm2/hr)")+
+  facet_grid(~field)
+
+ggplot(flux_data_n2o_cp, aes(x = plot, y = flux, color = plot)) +
+  geom_boxplot(outlier.alpha = 0.1, notch = T, varwidth = T, 
+               fill = "white", show.legend = T)+
+  labs(x = "Plot", y = "Flux (ng N/cm2/hr)")+
+  coord_cartesian(ylim = c(-4, 8))+
+  facet_grid(~field)
+```
+
+First boxplot shows full range of data with outliers.
+
+Second boxplot shows the central tendency of the data clearly, with 50% of the data indicated by the box, the median clearly visible as a line in the middle, and the IQ range +/- 1.5
+indicated by the whiskers.
+
+***
+
+####T-tests are for normally distrubted data around the mean.
+####Welch Two Sample t-Test for unequal variance
+
+```{r}
+
+t.test(flux~plot, data = flux_data_n2o_cp)
+
+
+```
+###Field 1
+```{r}
+#What they look like on each field individually
+flux_data_n2o_cp_F1 <- filter(flux_data_n2o, plot == "C"| plot == "P", field == "1")
+t.test(flux~plot, data = flux_data_n2o_cp_F1, var.equal = T)
+```
+###Field 2
+```{r}
+flux_data_n2o_cp_F2 <- filter(flux_data_n2o, plot == "C"| plot == "P", field == "2")
+t.test(flux~plot, data = flux_data_n2o_cp_F2, var.equal = T)
+
+```
+###Field 3
+```{r}
+flux_data_n2o_cp_F3 <- filter(flux_data_n2o, plot == "C"| plot == "P", field == "3")
+t.test(flux~plot, data = flux_data_n2o_cp_F3)
+
+```
+###Field 4
+```{r}
+flux_data_n2o_cp_F4 <- filter(flux_data_n2o, plot == "C"| plot == "P", field == "4")
+t.test(flux~plot, data = flux_data_n2o_cp_F4)
+#no significant difference between means, with 95% CI falling below means in both groups in all field
+```
+####No significant difference between means, with 95% CI falling below means in both groups in all field
+
+|NONPARAMETRIC TEST	| PARAMETRIC ALTERNATIVE|
+|------:|:-----|
+|1-sample sign test	| One-sample Z-test, One sample t-test|
+|1-sample Wilcoxon Signed Rank test	| One sample Z-test, One sample t-test|
+|Friedman test	| Two-way ANOVA|
+|Kruskal-Wallis test |	One-way ANOVA|
+|Mann-Whitney test	| Independent samples t-test
+|Mood’s Median test	| One-way ANOVA
+|Spearman Rank Correlation	| Correlation Coefficient
+
+###Wilcox tests
+####Results of Wilcoxon rank sum test on all fields and each field individually
+All fields
+```{r}
+wilcox.test(flux~plot, data = flux_data_n2o_cp) 
+```
+Significant, p-value < 0.05
+
+Field 1
+```{r}
+wilcox.test(flux~plot, data = flux_data_n2o_cp_F1) #approaching significance
+```
+Field 2
+```{r}
+wilcox.test(flux~plot, data = flux_data_n2o_cp_F2)
+```
+Field 3
+```{r}
+wilcox.test(flux~plot, data = flux_data_n2o_cp_F3)
+```
+Significant, p-value < 0.05
+
+Field 4
+```{r}
+wilcox.test(flux~plot, data = flux_data_n2o_cp_F4)
+```
+
+###Median Tests
+
+```{r}
+if(!require(psych)){install.packages("psych")}
+if(!require(FSA)){install.packages("FSA")}
+if(!require(lattice)){install.packages("lattice")}
+if(!require(multcompView)){install.packages("multcompView")}
+if(!require(rcompanion)){install.packages("rcompanion")}
+if(!require(Rcpp)){install.packages("Rcpp")}
+
+library(lattice)
+library(FSA)
+library(RVAideMemoire)
+#Summarise CP Median Data
+
+Summarize(flux ~ plot,
+          data = flux_data_n2o_cp,
+          digits = 3)
+```
+
+### Median Test for all fields
+
+```{r}
+mood.medtest(flux ~ plot,
+             data  = flux_data_n2o_cp,
+             exact = FALSE)
+flux_data_n2o_cp$plot = factor(flux_data_n2o_cp$plot, 
+                      levels=c("C","P"))
+
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = flux_data_n2o_cp,
+                        exact  = NULL,
+                        method = "fdr")
+
+library(multcompView)
+PT
+final <- multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+final
+```
+The median of the C plots is significantly higher than the median of the P plots, overall.
+
+###Field 1
+
+```{r}
+mood.medtest(flux ~ plot,
+             data  = flux_data_n2o_cp_F1,
+             exact = FALSE)
+flux_data_n2o_cp_F1$plot = factor(flux_data_n2o_cp_F1$plot, 
+                      levels=c("C","P"))
+
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = flux_data_n2o_cp_F1,
+                        exact  = NULL,
+                        method = "fdr")
+
+
+PT
+final <- multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+final
+
+Summarize(flux ~ plot,
+          data = flux_data_n2o_cp_F1,
+          digits = 3)
+```
+
+In field 1, the median of the C plot is significantly higher than the median of the P plot
+
+###Field 2
+```{r}
+
+mood.medtest(flux ~ plot,
+             data  = flux_data_n2o_cp_F2,
+             exact = FALSE)
+flux_data_n2o_cp_F2$plot = factor(flux_data_n2o_cp_F2$plot, 
+                      levels=c("C","P"))
+
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = flux_data_n2o_cp_F2,
+                        exact  = NULL,
+                        method = "fdr")
+
+
+PT
+final <- multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+final
+Summarize(flux ~ plot,
+          data = flux_data_n2o_cp_F2,
+          digits = 3)
+```
+
+No significant difference in plot medians of Field 2
+
+###Field 3
+
+```{r}
+mood.medtest(flux ~ plot,
+             data  = flux_data_n2o_cp_F3,
+             exact = FALSE)
+flux_data_n2o_cp_F3$plot = factor(flux_data_n2o_cp_F3$plot, 
+                      levels=c("C","P"))
+
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = flux_data_n2o_cp_F3,
+                        exact  = NULL,
+                        method = "fdr")
+
+
+PT
+final <- multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+final
+Summarize(flux ~ plot,
+          data = flux_data_n2o_cp_F2,
+          digits = 3)
+```
+
+Median of C is significantly higher than median of P in field 3
+
+
+###Field 4
+
+```{r}
+mood.medtest(flux ~ plot,
+             data  = flux_data_n2o_cp_F4,
+             exact = FALSE)
+flux_data_n2o_cp_F4$plot = factor(flux_data_n2o_cp_F4$plot, 
+                      levels=c("C","P"))
+
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = flux_data_n2o_cp_F4,
+                        exact  = NULL,
+                        method = "fdr")
+
+
+PT
+final <- multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+final
+Summarize(flux ~ plot,
+          data = flux_data_n2o_cp_F4,
+          digits = 3)
+```
+
+No significant differences in medians of plots in Field 4
+
+Both with the Wilcox Test and the Mood test, fields 1 and 3 have higher central tendencies in the C plots versus the P plots.
+
+##Gradient Plots
+
+```{r}
+flux_data_n2o_g <- filter(flux_data_n2o, plot != "C" & plot !="P") # Gradient Data
+ggplot(data = flux_data_n2o_g, mapping = aes(x = flux))+
+  geom_histogram(binwidth = 0.5)
+
+ggplot(data = flux_data_n2o_g, mapping = aes(x = flux, color = plot))+
+  geom_freqpoly(binwidth = 0.5)
+
+shapiro.test(flux_data_n2o_g$flux)#null hyp = data from norm distribution. Rejecte
+```
+
+####Null hypothesis that data are from normal distribution is rejected.
+
+```{r}
+Summarize(flux_data_n2o_g$flux)
+
+ggplot(flux_data_n2o_g, aes(x = plot, y = flux, color = plot)) +
+  geom_boxplot(outlier.alpha = 0.1, notch = T, varwidth = T, 
+               fill = "white", show.legend = T)+
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  facet_grid(~field)
+
+ggplot(flux_data_n2o_g, aes(x = plot, y = flux, color = plot)) +
+  geom_boxplot(outlier.alpha = 0.1, notch = T, varwidth = T, 
+               fill = "white", show.legend = T)+
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  coord_cartesian(ylim = c(-4, 10))+
+  facet_grid(~field)
+
+```
+
+```{r}
+if(!require(psych)){install.packages("psych")}
+if(!require(FSA)){install.packages("FSA")}
+if(!require(lattice)){install.packages("lattice")}
+if(!require(multcompView)){install.packages("multcompView")}
+if(!require(rcompanion)){install.packages("rcompanion")}
+if(!require(Rcpp)){install.packages("Rcpp")}
+library(lattice)
+library(FSA)
+library(coin)
+g_F1 <- filter(flux_data_n2o_g, field == "1")
+g_F2 <- filter(flux_data_n2o_g, field == "2")
+g_F3 <- filter(flux_data_n2o_g, field == "3")
+g_F4 <- filter(flux_data_n2o_g, field == "4")
+g_F1
+g_F2
+g_F3
+g_F4
+
+```
+
+###Median Tests
+
+```{r}
+median_test(flux~plot, data = flux_data_n2o_g)
+```
+
+
+###Field 1
+```{r}
+spread(g_F1, plot, flux) %>% 
+summary()
+```
+
+```{r}
+median_test(flux~plot, data = g_F1) #p-value < 0.05, “There was a significant difference in the median values among groups.”
+#Field 2
+median_test(flux~plot, data = g_F2)
+#Field 3
+median_test(flux~plot, data = g_F3)
+#Field 4
+median_test(flux~plot, data = g_F4)
+
+```
+
+In all fields, p-value < 0.05, “There was a significant difference in the median values among groups.”
+
+###Field 1
+
+```{r}
+library(RVAideMemoire)
+#field 1
+mood.medtest(flux ~ plot,
+             data  = g_F1,
+             exact = FALSE)
+g_F1$plot = factor(g_F1$plot, 
+                      levels=c("0", "25", "50", "75", "100"))
+
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = g_F1,
+                        exact  = NULL,
+                        method = "fdr")
+
+library(multcompView)
+PT
+multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+```
+
+```{r}
+ggplot(g_F1, aes(x = plot, y = flux, color = plot)) +
+  geom_boxplot(outlier.alpha = 0.1, notch = T, varwidth = T, 
+               fill = "white", show.legend = T)+
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  coord_cartesian(ylim = c(-4, 10))
+```
+
+###Kruskal-Wallis non-parametric alternative to one-way Anova with more than two groups
+
+```{r}
+library(ggpubr)
+compare_means(flux ~ plot, data = g_F1)
+my_comparisons <- list( c("0", "75"), c("0", "100"), c("25", "75"), c("25","100") )
+ggboxplot(g_F1, x = "plot", y = "flux",
+          color = "plot")+ 
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  coord_cartesian(ylim = c(-4, 10))+
+  stat_compare_means(comparisons = my_comparisons, label.y = c(2, 4.25, 6.5, 10), bracket.size = 0.1, tip.length = 0.001)+
+  stat_compare_means(label.y = 9.5
+                     )
+flux_sum <- g_F1 %>% 
+  group_by(plot) %>% 
+  summarise(meanf = mean(flux, na.rm = T),
+            sd_f = sd(flux, na.rm = T),
+            n_f = n(),
+            SE_f = sd_f/sqrt(n_f))
+
+ggplot(flux_sum, aes(plot, meanf, color = plot))+
+  geom_col(fill = "white")+
+  geom_errorbar(aes(ymin = meanf - SE_f, ymax = meanf + SE_f), width = 0.2)+
+  labs(x = "Plot", y = "Mean flux (ng N/cm^2/hr)")+
+  #stat_compare_means(data = g_F1, aes(x = plot, y = flux), comparisons = my_comparisons, label.y = c(2, 4.25, 6.5, 10), bracket.size = 0.1, tip.length = 0.001)+
+  stat_compare_means(data = g_F1, aes(x = plot, y = flux), label.y = 3.5)
+
+```
+
+###Field 2
+
+```{r}
+#field 2
+mood.medtest(flux ~ plot,
+             data  = g_F2,
+             exact = FALSE)
+g_F2$plot = factor(g_F2$plot, 
+                      levels=c("0", "25", "50", "75", "100"))
+library(rcompanion)
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = g_F2,
+                        exact  = NULL,
+                        method = "fdr")
+
+library(multcompView)
+multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+#medians are significantly different
+#Kruskal-Wallis for means
+compare_means(flux ~ plot, data = g_F2)
+my_comparisons <- list( c("0", "50"), c("0", "75"), c("0", "100"), c("25","50"), c("25","75"), c("25","100") )
+ggboxplot(g_F2, x = "plot", y = "flux",
+          color = "plot") +
+          #add = "jitter")+ 
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  #coord_cartesian(ylim = c(-4, 10))+
+  stat_compare_means(comparison = my_comparisons, label = "p.signif", step.increase = 0.5)+
+  stat_compare_means(label.y = 10)
+flux_sum <- g_F2 %>% 
+  group_by(plot) %>% 
+  summarise(meanf = mean(flux, na.rm = T),
+            sd_f = sd(flux, na.rm = T),
+            n_f = n(),
+            SE_f = sd_f/sqrt(n_f))
+
+ggplot(flux_sum, aes(plot, meanf, color = plot))+
+  geom_col(fill = "white")+
+  geom_errorbar(aes(ymin = meanf - SE_f, ymax = meanf + SE_f), width = 0.2)+
+  labs(x = "Plot", y = "Mean flux (ng N/cm^2/hr)")+
+  #stat_compare_means(data = g_F1, aes(x = plot, y = flux), comparisons = my_comparisons, label.y = c(2, 4.25, 6.5, 10), bracket.size = 0.1, tip.length = 0.001)+
+  stat_compare_means(data = g_F2, aes(x = plot, y = flux), label.y = 3.5)
+```
+
+###Field 3
+
+```{r}
+#field 3
+mood.medtest(flux ~ plot,
+             data  = g_F3,
+             exact = FALSE)
+g_F3$plot = factor(g_F3$plot, 
+                      levels=c("0", "25", "50", "75", "100"))
+library(rcompanion)
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = g_F3,
+                        exact  = NULL,
+                        method = "fdr")
+
+library(multcompView)
+multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+
+compare_means(flux ~ plot, data = g_F3)
+my_comparisons <- list( c("0", "50"), c("0", "75"), c("0", "100"), c("25","75"), c("25","100"),c("50","75"),c("50","100") )
+ggboxplot(g_F3, x = "plot", y = "flux",
+          color = "plot") +
+          #add = "jitter")+ 
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  #coord_cartesian(ylim = c(-4, 10))+
+  stat_compare_means(comparison = my_comparisons, label = "p.signif", step.increase = 0.5)+
+  stat_compare_means(label.y = 10)
+
+ggboxplot(g_F3, x = "plot", y = "flux",
+          color = "plot") +
+          #add = "jitter")+ 
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  coord_cartesian(ylim = c(-4, 10))+
+  stat_compare_means(comparison = my_comparisons, label = "p.signif", step.increase = 0.5)+
+  stat_compare_means(label.y = 10)
+
+flux_sum <- g_F3 %>% 
+  group_by(plot) %>% 
+  summarise(meanf = mean(flux, na.rm = T),
+            sd_f = sd(flux, na.rm = T),
+            n_f = n(),
+            SE_f = sd_f/sqrt(n_f))
+
+ggplot(flux_sum, aes(plot, meanf, color = plot))+
+  geom_col(fill = "white")+
+  geom_errorbar(aes(ymin = meanf - SE_f, ymax = meanf + SE_f), width = 0.2)+
+  labs(x = "Plot", y = "Mean flux (ng N/cm^2/hr)")+
+  #stat_compare_means(data = g_F1, aes(x = plot, y = flux), comparisons = my_comparisons, label.y = c(2, 4.25, 6.5, 10), bracket.size = 0.1, tip.length = 0.001)+
+  stat_compare_means(data = g_F3, aes(x = plot, y = flux), label.y = 3.5)
+```
+
+###Field 4
+
+```{r}
+#field 4
+mood.medtest(flux ~ plot,
+             data  = g_F4,
+             exact = FALSE)
+g_F4$plot = factor(g_F4$plot, 
+                      levels=c("0", "25", "50", "75", "100"))
+library(rcompanion)
+PT = pairwiseMedianMatrix(flux ~ plot,
+                        data   = g_F4,
+                        exact  = NULL,
+                        method = "fdr")
+
+library(multcompView)
+multcompLetters(PT$Adjusted,
+                compare="<",
+                threshold=0.05,
+                Letters=letters)
+
+compare_means(flux ~ plot, data = g_F4)
+my_comparisons <- list( c("0", "50"), c("0", "75"), c("0", "100"), c("25","75"), c("25","100"), c("50","75"), c("50", "100"))
+ggboxplot(g_F3, x = "plot", y = "flux",
+          color = "plot") +
+          #add = "jitter")+ 
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  #coord_cartesian(ylim = c(-4, 10))+
+  stat_compare_means(comparison = my_comparisons, label = "p.signif", step.increase = 0.5)+
+  stat_compare_means(label.y = 10)
+
+ggboxplot(g_F4, x = "plot", y = "flux",
+          color = "plot") +
+          #add = "jitter")+ 
+  labs(x = "Plot", y = "Flux (ng N/cm^2/hr)")+
+  coord_cartesian(ylim = c(-4, 10))+
+  stat_compare_means(comparison = my_comparisons, label = "p.signif", step.increase = 0.5)+
+  stat_compare_means(label.y = 10)
+
+flux_sum <- g_F4 %>% 
+  group_by(plot) %>% 
+  summarise(meanf = mean(flux, na.rm = T),
+            sd_f = sd(flux, na.rm = T),
+            n_f = n(),
+            SE_f = sd_f/sqrt(n_f))
+
+ggplot(flux_sum, aes(plot, meanf, color = plot))+
+  geom_col(fill = "white")+
+  geom_errorbar(aes(ymin = meanf - SE_f, ymax = meanf + SE_f), width = 0.2)+
+  labs(x = "Plot", y = "Mean flux (ng N/cm^2/hr)")+
+  #stat_compare_means(data = g_F1, aes(x = plot, y = flux), comparisons = my_comparisons, label.y = c(2, 4.25, 6.5, 10), bracket.size = 0.1, tip.length = 0.001)+
+  stat_compare_means(data = g_F4, aes(x = plot, y = flux), label.y = 3.5)
+```
+

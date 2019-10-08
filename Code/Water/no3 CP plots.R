@@ -24,6 +24,7 @@ n <- all_n %>%
 n
 pd <- position_dodge(.9)
 pdd <- position_dodge2(.9)
+
 ggplot(n) +
   geom_col(aes(treatment,mean, fill = compound), color = "black",
           width = 0.9, position  = pd) +

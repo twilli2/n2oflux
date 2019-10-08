@@ -4,6 +4,94 @@ library(splines)
 library(e1071)
 library(ggpubr)
 #normality test
+library(tidyverse)
+library(ggplot2)
+install.packages("pastecs")
+library(pastecs)
+flux_datan <- filter(flux_data, compound =="n2o")
+stat.desc(flux_datan)
+summary(flux_datan)
+
+N0 <- flux_datan %>%
+  filter(plot == "0") 
+stat.desc(N0)
+
+N25 <- flux_datan %>%
+  filter(plot == "25") 
+stat.desc(N25)
+%>% 
+  sapply(mean, na.rm = T) %>% 
+  summary()
+
+flux_datan %>% 
+  filter(plot == "0") %>% 
+  summary()
+plot(flux_datan$flux)
+ggplot(flux_datan)+
+  geom_boxplot(aes(plot, flux))
+ggplot(flux_datan)+
+  geom_col(aes(plot, flux))
+ggplot(flux_datan)+
+  geom_bar(aes(flux))
+
+
+grad_n2o <- filter(flux_data, compound == "n2o", plot != "C" & plot != "P") %>% 
+  group_by(date,field,plot)
+
+hist(grad_n2o$flux)
+shapiro.test((grad_n2o$flux))
+grad_n2o <- grad_n2o %>% 
+  mutate(lflux = log(flux))
+grad_n2o$plot <- factor(grad_n2o$plot, order = T, levels = c("0","25","50","75","100")) 
+
+summary(grad_n2o)
+hist(grad_n2o$lflux)
+shapiro.test((grad_n2o$lflux))
+ggplot(grad_n2o,aes(x = plot, y = log(flux), fill = plot)) +
+  geom_boxplot(color = "black", size = .05, alpha = 0.7) +
+  facet_wrap(~field)
+kruskal.test(flux~plot, grad_n2o)
+
+
+m = lm(flux~plot,grad_n2o)
+anova(m)
+TukeyHSD(m)
+#simple linear model flux and soil temp
+m = lm(flux~soiltemp, flux_datan)
+coeffs = coefficients(m); coeffs 
+stchange = 1           # degree of temp change 
+flux = coeffs[1] + coeffs[2]*stchange 
+flux
+newdata = data.frame(soiltemp= 1) # wrap the parameter
+predict(m, newdata)    # apply predict
+summary(m)$r.squared 
+#for each increase of soil temp by 1 degree, flux goes up by 0.74 ng N/m/H
+ggplot(flux_datan) + 
+  geom_point(aes(x = soiltemp, y = flux))
+
+df <- filter(grad_n2o) %>% 
+  group_by(plot) %>% 
+  summarize(flux_mean = mean (flux,na.rm = T),sd = sd(flux,na.rm = T))
+
+df
+
+
+
+#stat_boxplot(geom = "errorbar")
+
+hist(grad_n2o$flux, breaks = 50)
+summary.data.frame(grad_n2o)
+qqnorm(grad_n2o$flux)
+qqline(grad_n2o$flux)
+?hist
+abline
+ggdensity(cp_n2o$soiltemp)
+ggqqplot(cp_n2o$soiltemp)
+shapiro.test(grad_n2o$flux)
+
+s1 <- sample(grad_n2o$flux, 1000)
+shapiro.test(s1)
+
 
 ggdensity(cp_n2o$soiltemp)
 ggqqplot(cp_n2o$soiltemp)

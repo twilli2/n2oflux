@@ -62,6 +62,12 @@ t_n <- total_n %>%
 
 tn <- select(total_n,1,2,7,8,9)
 
+#y2$date <- as.POSIXct(y2$date)
+
+ggplot(cum_n, aes(x = date, y = cum_n, color = plot)) +
+  geom_point(size = 2, shape = 1) +
+  geom_line(size = 1)+
+  facet_grid(~field)
 #n2o gradient only
 j <- select(p,1,2,3,8,16)
 
@@ -89,12 +95,47 @@ total_n <- t_n %>%
   summarize(total_n = sum(total_n)) %>% 
   mutate(total_n = total_n*1.12085) 
 
+ggplot()+
+  geom_smooth(data = filter(co2flux, season == 1), aes(x = date, y = max_flux, color = field),se = F)+
+  geom_smooth(data = filter(co2flux, season == 1), aes(x = date, y = min_flux, color = field),se = F)+
+  geom_smooth(data = filter(co2flux, season == 2), aes(x = date, y = max_flux, color = field),se = F)+
+  geom_smooth(data = filter(co2flux, season == 2), aes(x = date, y = min_flux, color = field),se = F)+
+  geom_point(aes(x = date, y = total_n*0.00095, color = field), data = filter(total_n))+
+  theme_bw() +
+  theme(axis.text.x  = element_text(size=16, colour="black"),  
+        axis.title.x = element_text(size = 16, vjust=-0.1, face = "bold"),
+        axis.text.y = element_text(size=16, colour="black"),
+        axis.title.y = element_text(vjust=1.8, size = 16, face = "bold"),
+        legend.text = element_text(size = 16),
+        legend.title = element_text("Field",size = 16))+
+        #strip.text.x = element_text(size = 16, colour = "black", face = "bold", angle = 0))+
+   labs(y = expression(Minimum~and~Maximum~Flux~" "~CO[2]-C~~g~~m^{-2}~h^{-1}), x = "", color='Field')
+
 
 n2oflux <- filter(flux_data, n2o_rsq >= 0.30 & n2o_rsq < 1, plot != "C" & plot != "P") %>% 
   select(1,2,3,9,8,16) %>%
   group_by(date,field,season) %>% 
   summarise(max_flux = max(n2o_flux),min_flux = min(n2o_flux))
 
+ggplot()+
+  geom_smooth(data = filter(n2oflux, season == 1), aes(x = date, y = max_flux, color = field),se = F)+
+  geom_smooth(data = filter(n2oflux, season == 1), aes(x = date, y = min_flux, color = field),se = F)+
+  geom_smooth(data = filter(n2oflux, season == 2), aes(x = date, y = max_flux, color = field),se = F)+
+  geom_smooth(data = filter(n2oflux, season == 2), aes(x = date, y = min_flux, color = field),se = F)+
+  geom_point(aes(x = date, y = total_n*0.1, color = field), data = filter(total_n))+
+  theme_bw() +
+  theme(axis.text.x  = element_text(size=16, colour="black"),  
+        axis.title.x = element_text(size = 16, vjust=-0.1, face = "bold"),
+        axis.text.y = element_text(size=16, colour="black"),
+        axis.title.y = element_text(vjust=1.8, size = 16, face = "bold"),
+        legend.text = element_text(size = 16),
+        legend.title = element_text("Field",size = 16))+
+        #strip.text.x = element_text(size = 16, colour = "black", face = "bold", angle = 0))+
+  #ylab=expression(Production~rate~" "~mu~moles~NO[3]^{-1}-N~Kg^{-1}) 
+  labs(y = expression(Minimimum~and~Maximum~Flux~" "~N[2]~O-N~~ng~cm^{-2}~h^{-1}), x = "", color='Field')
+  
+
+         
 j2$month <- month(j2$date)
 j2$year <- year(j2$date)
 j2 <- select(j2,1,2,4,5,6)
