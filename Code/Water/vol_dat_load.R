@@ -1,14 +1,14 @@
 library(readxl)
 library(tidyverse)
 library(lubridate)
-
+library(broom)
 
 vol_dat <- read_csv("C:/Users/twilli2/Dropbox/Lab data/S Willamette GWMA Dropbox/Lysimeter Data/vol_dat.csv",
 col_types = cols(Date = col_date(format = "%m/%d/%Y"),
 Field = col_factor(levels = c("1",
 "2", "3", "4")), Treatment = col_factor(levels = c("CV",
 "PA", "N0", "N2", "N5", "N7",
-"N1")), Volume = col_number()))
+"N1")), Volume = col_number(), 'X6' = col_skip(), 'X7' = col_skip()))
 
 vol_dat$Date<-as.Date(vol_dat$Date)
 
@@ -44,6 +44,9 @@ meanCV <- df %>%
   group_by(field,date,treatment) %>% 
   summarize(mean = mean(concentration, na.rm = T))
 utils::View(meanCV)
+
+ggplot(data= meanCV)+
+  geom_boxplot(aes(treatment, mean))
 
 nh4 <- df %>% 
   filter(compound == "nh3") %>% 

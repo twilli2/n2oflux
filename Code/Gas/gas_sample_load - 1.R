@@ -8,8 +8,9 @@ x <- read_excel("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Gas Sample Data/Fi
 sheet = "6.27.18 ConcSlopes", na = "skip",
 n_max = 355)
 x <- rename(x, date = `Sample Date`, field = 'FIELD #', plot = 'N ADDITION/TREATMENT', chamber = "CHAMBER", co2 = `[CO2] PPM`, time_pnt = `TIME POINT`, n2o = `[N2O] PPM`, time = 'Minutes')
+x <- filter(x,Trip == "19")
 x <- select(x,3,4,5,6,8,9,15)
-x <- x[-which(is.na(x$time_pnt)),]
+#x <- x[-which(is.na(x$time_pnt)),]
 
 x <- x %>% 
   replace_with_na_at(.vars = c("n2o"),
@@ -18,6 +19,27 @@ x <- x %>%
   replace_with_na_at(.vars = c("co2"), condition = ~ (.x) <= 300)
 
 x <- x[-which(is.na(x$n2o)),]
+
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -102,7 +124,8 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
+  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -196,7 +219,8 @@ s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
 z<- y %>%
- select(1,2,3,7,8,9,11,10) %>% 
+ filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
+  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
 n <- setDT(z)[, .SD[which.max(n2o_rsq)], id]
@@ -204,7 +228,6 @@ n$date <- as.Date("2018-06-27", format = ("%Y-%m-%d"))
 n <- select(n,9,2,3,4,6,7,8)
 
 z <- left_join(c,n, by = c("date","field","plot","chamber"))
-z <- filter(z, field != 1)
 final_flux <- (z)
 rm(c,id,n,r1,r2,r3,r4,s1,s2,s3,s4,x,y,z)
 ########18
@@ -212,6 +235,7 @@ rm(c,id,n,r1,r2,r3,r4,s1,s2,s3,s4,x,y,z)
 x <- read_excel("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Gas Sample Data/Field Visit 18/Data Field Visit 18.xlsx",
 sheet = "6.13.18 ConcSlopes", na = "skip",
 n_max = 355)
+x <- filter(x,Trip == "18")
 x <- rename(x, date = `Sample Date`, field = 'FIELD #', plot = 'N ADDITION/TREATMENT', chamber = "CHAMBER", co2 = `[CO2] PPM`, time_pnt = `TIME POINT`, n2o = `[N2O] PPM`, time = 'Minutes')
 x <- select(x,3,4,5,6,8,9,15)
 
@@ -221,7 +245,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
-x <- x[-which(is.na(x$time_pnt)),]
+#x <- x[-which(is.na(x$time_pnt)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
 #x <- x[-which(is.na(x$co2)),]
 #x <- x[-which(is.na(x$n2o)),]
  
@@ -310,7 +353,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -403,7 +446,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -429,6 +472,26 @@ x <- x %>%
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
 x <- x[-which(is.na(x$n2o)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -513,7 +576,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -606,7 +669,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -631,6 +694,25 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -715,7 +797,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -808,7 +890,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -828,6 +910,26 @@ x <- select(x,3,4,5,6,8,9,15)
 
 x <- x[-which(is.na(x$time_pnt)),]
 #x <- x[-which(is.na(x$n2o)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -912,7 +1014,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1005,7 +1107,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1039,6 +1141,25 @@ x <- x %>%
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
 x <- x[-which(is.na(x$co2)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
 
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
@@ -1124,7 +1245,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1217,7 +1338,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1244,6 +1365,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -1328,7 +1469,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1421,7 +1562,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1448,6 +1589,25 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -1532,7 +1692,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1625,7 +1785,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1653,6 +1813,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -1737,7 +1917,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1830,7 +2010,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -1858,6 +2038,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -1942,7 +2142,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2035,7 +2235,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2063,6 +2263,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -2147,7 +2367,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2240,7 +2460,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2269,6 +2489,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -2353,7 +2593,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2446,7 +2686,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2473,6 +2713,26 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -2557,7 +2817,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2650,7 +2910,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2677,6 +2937,25 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
 #x <- x[-which(is.na(x$n2o)),]
 #x <- x[-which(is.na(x$co2)),]
 s1 <- x %>%  
@@ -2764,7 +3043,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,4,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2857,7 +3136,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -2885,6 +3164,26 @@ x <- x %>%
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
 x <- x[-which(is.na(x$co2)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -2969,7 +3268,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3062,7 +3361,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3092,6 +3391,26 @@ x <- x %>%
 x <- x[-which(is.na(x$time_pnt)),]
 #x <- x[-which(is.na(x$co2)),]
 #x <- x[-which(is.na(x$n2o)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -3176,7 +3495,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3269,7 +3588,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3306,6 +3625,26 @@ x <- x %>%
 x <- x[-which(is.na(x$time_pnt)),]
 #x <- x[-which(is.na(x$co2)),]
 #x <- x[-which(is.na(x$n2o)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -3390,7 +3729,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq < 1 & co2_rsq > 0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3483,7 +3822,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3512,6 +3851,25 @@ x <- x %>%
 x <- x %>% 
   replace_with_na_at(.vars = c("co2"),
                      condition = ~ (.x) <= 300)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
 #x <- x[-which(is.na(x$time_pnt)),]
 #x <- x[-which(is.na(x$co2)),]
 #x <- x[-which(is.na(x$n2o)),]
@@ -3599,7 +3957,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3692,7 +4050,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3728,6 +4086,26 @@ x <- x %>%
 x <- x[-which(is.na(x$time_pnt)),]
 x <- x[-which(is.na(x$co2)),]
 x <- x[-which(is.na(x$n2o)),]
+x %>%  
+  group_by(field, plot, chamber) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 4) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 2) %>%
+  tally() %>% 
+  filter(n>4)
+x %>%  
+  group_by(field, plot, chamber) %>%
+  filter(time_pnt  != 1) %>%
+  tally() %>% 
+  filter(n>4)
+
 s1 <- x %>%  
   group_by(field, plot, chamber) %>%
   do(tidy(lm(co2 ~ time, data = .))) %>%   
@@ -3812,7 +4190,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(co2_rsq<1 & co2_rsq>0.1) %>% 
   select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()
@@ -3905,7 +4283,7 @@ r4$mod <- 4
 s4 <- left_join(s4,r4)
 y <- bind_rows(y,s4)
 
-z<- y %>%
+z<- y %>%  filter(n2o_rsq<1 & n2o_rsq>0.1) %>% 
  select(1,2,3,7,8,9,11,10) %>% 
   arrange(field, match(plot, c("GN0","N25","N50", "N75", "100", "CNV", "PAG")), chamber) %>%
   distinct()

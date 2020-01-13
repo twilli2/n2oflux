@@ -57,20 +57,26 @@ j$plot[j$plot == "Conv"] <- "C"
 j$plot[j$plot == "PA"] <- "P"
 
 #mean gradient flux by date and plot with abherrant slopes removed
-j <- filter(j, n2o_rsq >= 0.30 & n2o_rsq < 1) %>% 
-  filter(plot != "C" & plot != "P") %>% 
-  group_by(field, plot, date, season) %>% 
-  summarise(mean_flux = mean(n2o_flux)) %>% 
+#j <- filter(j, n2o_rsq >= 0.30 & n2o_rsq < 1)%>% 
+t <-   filter(j,plot != "C" & plot != "P") %>% 
+  group_by(field, plot, date, season) %>%
+  tally() 
+j <-   filter(j,plot != "C" & plot != "P") %>% 
+  group_by(field, plot, date, season) %>%
+  summarise(mean_flux = mean(n2o_flux,na.rm = T),sd = sd(n2o_flux,na.rm = T)) %>% 
   arrange(match(plot, c("0","25","50", "75", "100")),-desc(field), -desc(date))
+j <- left_join(j,t) 
+j <- j %>% 
+  mutate(se = sd/sqrt(n))
+j$season <- as.character(j$season)
 
 #daily mean flux 268 days in season 1, 224 days in season 2
 
 total_flux <- j %>%
   group_by(field,plot) %>% 
-  summarise(total_flux = sum(mean_flux,na.rm=T)/492) %>% 
+  summarise(se = sum(se,na.rm=T)/492, total_flux = sum(mean_flux, na.rm=T)/492) %>% 
   mutate(total_flux = total_flux*2.4)
 total_flux$field <- as.factor(total_flux$field)
-
 total_n <- t_n %>% 
   group_by(field,plot) %>% 
   summarize(total_n = sum(total_n)) %>% 
@@ -78,14 +84,17 @@ total_n <- t_n %>%
 total_n$field <- as.factor(total_n$field)
 flux_tn <- left_join(total_flux,total_n)
 
-###Figure 1. Average daily flux as function on nitrogen rate by field. Least squared quadratic regression
-
-ggplot(data = flux_tn, aes(total_n,total_flux))+
-  geom_point(aes(color = field), size = 6) +
+###Figure 1. Average daily flux as function of nitrogen rate by field. Least squared quadratic regression
+#Field 1 removed
+ggplot(data = filter(flux_tn, field != 1), aes(total_n,total_flux))+
+  geom_point(aes(color = field), size = 6, alpha = .50) +
+  geom_errorbar(aes(ymin=total_flux-se, ymax=total_flux+se), width=5,
+                 position=position_dodge())+
   stat_smooth(method = "lm",
-              formula = y ~ x + poly(x, 2) - 1) +
-  labs(x = expression("Average nitrogen rate (kg N"~~ha^{-1}~year^{-1}*")"))+ 
+              formula = y~x+I(x^2))+
+              labs(x = expression("Average nitrogen rate (kg N"~~ha^{-1}~year^{-1}*")"))+ 
   labs(y = expression(Average~daily~flux~" "~(g~N[2]*O-N~ha^{-1}~day^{-1})), color='Field') +
+  annotate("rect",xmin = 145,xmax = 200,ymin=-Inf,ymax=Inf, alpha=0.1, fill="blue")+
   annotate(geom = "text", x=200, y=0.1, label= ("r-squared = 0.83\np-value < 0.001"),size = 6)+
    theme_bw() +
    theme(axis.text.x  = element_text(size=20, colour="black"),  
@@ -99,14 +108,55 @@ ggplot(data = flux_tn, aes(total_n,total_flux))+
          legend.box.background = element_rect(colour = "black"),
          strip.text.x = element_text(size = 20, colour = "black", face = "bold", angle = 0))
 
-#+ I(x^2)
+#removing field 1
 flux_tn <- mutate(flux_tn, total_n2=total_n^2)
-mod <- lm(total_flux~total_n, data = flux_tn)
+mod <- lm(total_flux~total_n, data = filter(flux_tn, field != 1))
 summary(mod)
-quadmod <- lm(total_flux~total_n+total_n2, data = flux_tn)
+quadmod <- lm(total_flux~total_n+total_n2, data = filter(flux_tn, field != 1))
 summary(quadmod)
-logmod <- lm(log(total_flux)~log(total_n), data = flux_tn)
+logmod <- lm(log(total_flux)~total_n, data = flux_tn)
 summary(logmod)
+
+linear <- lm(total_flux~total_n,data=flux_tn)
+quad_n <- lm(total_flux~total_n+I(total_n^2),data = flux_tn)
+
+log_n <- lm((log(total_flux)~total_n), data = flux_tn)
+poly_n <- lm(total_flux~total_n+I(total_n^2) + I(total_n^3),flux_tn)#cubic
+exp_n <- lm(total_flux~I(total_n^2), data = flux_tn)#exponential
+        
+new.data <- data.frame(total_n=seq(from=min(flux_tn$total_n),
+                                           to=max(flux_tn$total_n),
+                                                  length.out = 200))
+
+pred_lm <- predict(linear,newdata=new.data)
+pred_quad <- predict(quad_n,newdata=new.data)
+pred_poly <- predict(poly_n,newdata=new.data)
+pred_exp <- predict(exp_n,newdata=new.data)
+pred_log <- predict(log_n,newdata=new.data)
+preds <- data.frame(new.data,
+                    lm = pred_lm,
+                    quad= pred_quad,
+                    poly=pred_poly,
+                    exp=pred_exp)
+                    #log=pred_log)
+
+preds <- reshape2::melt(preds,
+                        id.vars=1)
+
+ggplot(data =preds) + 
+  geom_line(aes(x=total_n,y=value, color = variable))+
+  geom_point(data=flux_tn,aes(x = total_n, y = total_flux, color = field))
+summary(quad_n)
+summary(linear)
+summary(poly_n)
+summary(exp_n)
+plot(exp_n)
+
+summary(log_n)
+augment(exp_n) %>% 
+  arrange(-.cooksd)
+
+
 #season 1
 total_flux1 <- j %>%
   group_by(field,plot) %>% 
@@ -180,8 +230,10 @@ ggplot(data = flux_tn1, aes(total_n,total_flux, color = field))+
   labs(x = expression("Average nitrogen rate (kg N"~ha^{-1}~year^{-1}*")"))+ 
   labs(color='Field')+
   labs(y = expression(Average~daily~flux~" "~(g~N[2]*O-N~~ha^{-1}~day^{-1})), color='Field') +
-  annotate(geom = "text", x=230, y=.2, label= ("Year 1\nr-squared = 0.67\np-value < 0.001"), size = 6)+
-  annotate(geom = "text", x=230, y=.9, label= ("Year 2\nr-squared = 0.76\np-value < 0.001"), size = 6)+
+  annotate("rect",xmin = 145,xmax = 200,ymin=-Inf,ymax=Inf, alpha=0.1, fill="blue")+
+  annotate(geom = "text", x=235, y=.2, label= ("Year 1\nr-squared = 0.67\np-value < 0.001"), size = 6)+
+  annotate(geom = "text", x=235, y=.9, label= ("Year 2\nr-squared = 0.76\np-value < 0.001"), size = 6)+
+  
   theme_bw() +
   theme(axis.text.x  = element_text(size=20, colour="black"),  
         axis.title.x = element_text(size = 20, vjust=-0.1, face = "bold"),
@@ -194,3 +246,69 @@ ggplot(data = flux_tn1, aes(total_n,total_flux, color = field))+
          legend.box.background = element_rect(colour = "black"),
         strip.text.x = element_text(size = 20, colour = "black", face = "bold", angle = 0))
   
+
+ #no averaging models
+#individual fields season 2
+mod3 <- lm(mean_flux~total_n, data = filter(flux_tn3, field ==1))
+quad3 <- lm(total_flux~total_n+total_n^2,data=flux_tn2)
+summary(quad3)
+summary(mod3)
+
+mod4 <- lm(total_flux~total_n, data = filter(flux_tn2, field ==2))
+quad4 <- lm(total_flux~total_n+total_n^2,data=flux_tn2)
+summary(quad4)
+summary(mod4)
+
+#all fields no averaging
+flux_tn3 <- flux_tn3 %>% 
+  mutate(total_n2 = total_n^2) 
+mod4 <- lm(mean_flux~total_n, data = flux_tn3)
+quad4 <- lm(mean_flux~total_n+total_n2,data=flux_tn3)
+summary(quad4)
+summary(mod4)
+
+resids4 <- mod4$resid
+shapiro.test(resids4)
+resids4 <- quad4$resid
+shapiro.test(resids4)
+
+total_n2 <- t_n %>% 
+  group_by(field,plot,season) %>% 
+  summarize(total_n = sum(total_n)) %>% 
+  mutate(total_n = (total_n*1.12085)) 
+total_n2$season<- as.character(total_n2$season)
+
+flux_tn3 <- left_join(j,total_n2, by = c("field","plot","season"))
+flux_tn3 <- flux_tn3 %>%
+  filter(season == 2) %>% 
+  group_by(field,plot) %>% 
+  summarize(mean_flux = mean(mean_flux,na.rm = T),total_n = mean(total_n))
+### Figure 3. Avereage daily flux by N rate by year
+ggplot(data = flux_tn3, aes(total_n,mean_flux, color = field))+
+  geom_point(size = 6, shape = 21, stroke = 3)+
+    #geom_point(data = flux_tn3, size = 6, shape = 22, stroke = 3)+
+  stat_smooth(data = flux_tn3, aes(total_n, mean_flux), color = "grey39", size = 2, method = "lm",
+              formula = y ~ x, se = FALSE, inherit.aes = F)+
+  stat_smooth(data = flux_tn3, aes(total_n, mean_flux), color = "grey57", size = 1, method = "lm",
+              formula = y ~ x + poly(x, 3) - 1, se = FALSE, inherit.aes = F) 
+
+  labs(x = expression("Average nitrogen rate (kg N"~ha^{-1}~year^{-1}*")"))+ 
+  labs(color='Field')+
+  labs(y = expression(Average~daily~flux~" "~(g~N[2]*O-N~~ha^{-1}~day^{-1})), color='Field') +
+  annotate("rect",xmin = 145,xmax = 200,ymin=-Inf,ymax=Inf, alpha=0.1, fill="blue")+
+  annotate(geom = "text", x=235, y=.2, label= ("Year 1\nr-squared = 0.67\np-value < 0.001"), size = 6)+
+  annotate(geom = "text", x=235, y=.9, label= ("Year 2\nr-squared = 0.76\np-value < 0.001"), size = 6)+
+  
+  theme_bw() +
+  theme(axis.text.x  = element_text(size=20, colour="black"),  
+        axis.title.x = element_text(size = 20, vjust=-0.1, face = "bold"),
+        axis.text.y = element_text(size=20, colour="black"),
+        axis.title.y = element_text(vjust=1.8, size = 20, face = "bold"),
+        legend.text = element_text(size = 20),
+        legend.title = element_text("Field",size = 20),
+        legend.position = c(0.08, 0.85),
+         legend.background = element_blank(),
+         legend.box.background = element_rect(colour = "black"),
+        strip.text.x = element_text(size = 20, colour = "black", face = "bold", angle = 0))
+
+          

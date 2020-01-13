@@ -12,6 +12,11 @@ co2flux <- co2flux %>%
 co2flux$plot <- factor(co2flux$plot,levels = c("0","25","50", "75", "100"))
 fieldnames <- c("1"= "Field 1","2" = "Field 2","3" = "Field 3", "4" = "Field 4")
 
+n_dates <- total_n %>% 
+  group_by(date, field) %>% 
+  select(1,2)
+n_dates$cum_flux <- 0
+
 ggplot(data = co2flux) + 
   geom_point(aes(date,cum_flux,color = plot)) +
   geom_line(aes(date,cum_flux,color = plot))+

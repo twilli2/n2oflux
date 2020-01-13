@@ -21,7 +21,7 @@ library(ggplot2)
 ggplot(sum_behaviours, aes(x = field, y = flux, fill = plot)) +
   scale_fill_discrete(name = "Treatment", labels = c("Conventional","EEF")) +
   geom_bar(position=position_dodge(), stat="identity") +
-  geom_errorbar(aes(ymin = flux - ci, ymax = flux + ci),
+  geom_errorbar(aes(ymin = flux - se, ymax = flux + se),
                 width=.2, position = position_dodge(.9)) +
   theme(axis.text.x = element_text(angle = , hjust = 1))+
   theme(panel.background = element_rect(fill='white', colour='white'), 
