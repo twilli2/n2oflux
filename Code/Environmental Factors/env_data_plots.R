@@ -49,7 +49,7 @@ ggplot(data = joined_env_data) +
 joined_env_data$date <- as.Date(joined_env_data$date)
 ggplot(data = joined_env_data) + 
   geom_line(mapping = aes(x = date, mean_avg_moist, color = field), size = 1) +
-  ylab("Daily average soil mositure") + labs(color='Field', values = c("coral1", "palegreen3","steelblue2","plum4"))+
+  ylab("Daily average soil mositure (%)") + labs(color='Field', values = c("coral1", "palegreen3","steelblue2","plum4"))+
   xlab("")+
   scale_color_manual(labels = c("1", "2","3","4"), values = c("coral", "palegreen3","steelblue2","plum3"))+
   annotate("rect",xmin = as.Date("2019-06-12"),xmax = as.Date("2019-07-25"),ymin=-Inf,ymax=Inf, alpha=0.1, fill="black")+
@@ -65,11 +65,12 @@ ggplot(data = joined_env_data) +
         axis.title.y = element_text(vjust=1.8, size = 20, face = "plain"),
         legend.text = element_text(size = 20),
         legend.title = element_text(size = 20),
+        legend.position = "bottoms",
         strip.text.x = element_text(size = 20, colour = "black", face = "plain", angle = 0))
 
 ###average daily temperature from both sensors
 ggplot(data = joined_env_data) + 
-  geom_line(mapping = aes(x = date, mean_avg_temp, color = field), size = 1) +
+  geom_line(mapping = aes(x = date, mean_avg_temp, color = field), size = 1.2) +
   #scale_colour_manual(name = "", 
   #                    breaks = c("Max 5cm","Max 10cm","Min 5cm","Min 10cm"),
   #                    values = c("Max 5cm"="deeppink","Max 10cm"="cyan","Min 5cm"="deeppink3","Min     #                    10cm"="cyan3")) +
@@ -79,12 +80,13 @@ ggplot(data = joined_env_data) +
   ylab("Daily average soil temperature (\u00B0C)") + labs(color='Field')  +
   scale_color_manual(labels = c("1", "2","3","4"), values = c("coral", "palegreen3","steelblue2","plum3"))+
   theme_bw() +
-  theme(axis.text.x  = element_text(size=20, colour="black", face = "plain"),  
-        axis.title.x = element_text(size = 20, vjust=-0.1, face = "plain"),
-        axis.text.y = element_text(size=20, colour="black"),
-        axis.title.y = element_text(vjust=1.8, size = 20, face = "plain"),
+  theme(axis.text.x  = element_text(size=18, colour="black", face = "plain"),  
+        axis.title.x = element_text(size = 20, face = "plain"),
+        axis.text.y = element_text(size=18, colour="black"),
+        axis.title.y = element_text(hjust = 1,vjust=1.8, size = 20, face = "plain"),
         legend.text = element_text(size = 20),
         legend.title = element_text("Field",size = 20),
+        legend.position = "bottom",
         strip.text.x = element_text(size = 20, colour = "black", face = "plain", angle = 0))
  # facet_wrap(~field, nrow = 4)
 
