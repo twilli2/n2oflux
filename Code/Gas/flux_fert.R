@@ -69,6 +69,7 @@ ggplot(cum_n, aes(x = date, y = cum_n, color = plot)) +
   geom_line(size = 1)+
   facet_grid(~field)
 #n2o gradient only
+
 j <- select(p,1,2,3,8,16)
 
 j$plot[j$plot == "N0"] <- "0"
@@ -84,6 +85,8 @@ j <- filter(j, n2o_rsq >= 0.30 & n2o_rsq <= 1) %>%
   group_by(field, plot, date) %>% 
   summarise(mean_flux = mean(n2o_flux)) %>% 
   arrange(match(plot, c("0","25","50", "75", "100")),-desc(field), -desc(date))
+
+write.csv(j,"~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/mean_flux.csv")
 
 co2flux <- filter(flux_data, co2_rsq >= 0.30 & co2_rsq < 1, plot != "C" & plot != "P") %>% 
   select(1,2,3,9,6,15) %>%

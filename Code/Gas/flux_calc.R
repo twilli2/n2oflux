@@ -431,3 +431,4 @@ p$plot[p$plot == "Conv"] <- "C"
 p$plot[p$plot == "PA"] <- "P"
 flux_data <- p
 rm(f,s,flux)
+write.csv(p,"~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/flux_data.csv")

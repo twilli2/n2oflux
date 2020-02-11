@@ -4,27 +4,29 @@ library(readxl)
 library(plotrix)
 library(lubridate)
 library(readxl)
+#loading fertilizer data
 fert_data <- read_excel("C:/Users/twilli2/Dropbox/Lab data/S Willamette GWMA Dropbox/Fert-Yield data/Fertilizer Plans.xlsx",
 sheet = "total fert", col_types = c("date","text", "text", "numeric", "numeric",
                       "numeric", "numeric", "numeric"))
-
+#creates, simplifies and summarizes data frame 
+#into totals by field
 df <- fert_data %>% 
   filter(plot == "100") %>% 
   select_all() %>% 
   group_by(date, field) %>% 
   summarize(N100 = sum(tn_ac)) %>% 
   arrange(field)
-
+#calculates rates based on percentage of 100% plot
 df <- df %>% 
   mutate('100' = N100, '75' = N100 * 0.75, '50' = N100 * 0.50, '25' = N100 * 0.25, '0' = N100 * 0)
-
+#insures data are in proper format
 df$field <- as.factor(df$field)
 df$plot <- as.factor(df$field)
 df$date <- as.Date(df$date)
 df$month <- month(df$date) 
 df$year <- year(df$date)
 df$quarter <- quarter(df$date)
-
+#adds season columns
 y1a <- df %>% 
   filter(quarter == "4" & year == "2017"| quarter == "2" & year == "2017")
 y1b <- df %>% 
@@ -48,6 +50,7 @@ rm(df,fert_data,y1,y1a,y1b,y2,y2a,y2b)
 ##load gas sample and flux calc data
 j <- select(p,1,2,3,8,9,16)
 
+#makes sure names match
 j$plot[j$plot == "N0"] <- "0"
 j$plot[j$plot == "N25"] <- "25"
 j$plot[j$plot == "N50"] <- "50"
@@ -56,11 +59,15 @@ j$plot[j$plot == "N100"] <- "100"
 j$plot[j$plot == "Conv"] <- "C"
 j$plot[j$plot == "PA"] <- "P"
 
-#mean gradient flux by date and plot with abherrant slopes removed
-#j <- filter(j, n2o_rsq >= 0.30 & n2o_rsq < 1)%>% 
+#very little difference if
+#mean gradient flux by date and plot with abherrant slopes are removed
+#j <- filter(j, n2o_rsq >= 0.30 & n2o_rsq < 1 
+
+#creates tally for standard error calculations
 t <-   filter(j,plot != "C" & plot != "P") %>% 
   group_by(field, plot, date, season) %>%
   tally() 
+#summarizes individual chamber flux data into average flux by plot
 j <-   filter(j,plot != "C" & plot != "P") %>% 
   group_by(field, plot, date, season) %>%
   summarise(mean_flux = mean(n2o_flux,na.rm = T),sd = sd(n2o_flux,na.rm = T)) %>% 
@@ -71,27 +78,132 @@ j <- j %>%
 j$season <- as.character(j$season)
 
 #daily mean flux 268 days in season 1, 224 days in season 2
+#dividing total flux by number of days in sampling seasons
+#multiplying by conversion factor to get kg/ha/day
 
 total_flux <- j %>%
   group_by(field,plot) %>% 
   summarise(se = sum(se,na.rm=T)/492, total_flux = sum(mean_flux, na.rm=T)/492) %>% 
   mutate(total_flux = total_flux*2.4)
 total_flux$field <- as.factor(total_flux$field)
+##
+total_flux_by_field <- j %>%
+  group_by(season,field,plot) %>% 
+  summarise(se = sum(se,na.rm=T)/246, total_flux = sum(mean_flux, na.rm=T)/246) %>% 
+  mutate(total_flux = total_flux*2.4)
+total_flux_by_field$field <- as.factor(total_flux_by_field$field)
+#average n addition per season #
+#multiplying to get kg/ha dividing by two seasons
 total_n <- t_n %>% 
   group_by(field,plot) %>% 
   summarize(total_n = sum(total_n)) %>% 
   mutate(total_n = (total_n*1.12085)/2) 
 total_n$field <- as.factor(total_n$field)
 flux_tn <- left_join(total_flux,total_n)
+##
+total_n_by_field <- t_n %>% 
+  group_by(season,field,plot) %>% 
+  summarize(total_n = sum(total_n)) %>% 
+  mutate(total_n = (total_n*1.12085)) 
+total_n_by_field$field <- as.factor(total_n_by_field$field)
+flux_tn_by_field <- left_join(total_flux_by_field,total_n_by_field)
+##all fields
+log <- lm(log(total_flux+10)~total_n+season+field, data = flux_tn_by_field)
+summary(log)
+mod <- lm(total_flux~total_n+season+field, data = flux_tn_by_field)
+quad <- lm(total_flux~total_n+(I(total_n^2))+season+field, data=flux_tn_by_field)
+##
+ggplot(data = flux_tn_by_field,aes(total_n,log(total_flux+10)))+
+  geom_point()+
+  stat_smooth()+
+  facet_grid(field~season)
+plot(log)
+shapiro.test(log$residuals)
+shapiro.test(mod$residuals)
+library(lmtest)
+bptest(mod)
+ggplot(data = flux_tn_by_field,aes(total_n,total_flux))+
+  geom_point()+
+  stat_smooth()+
+  facet_grid(field~season)
+summary(mod)
+library(sandwich)
+coeftest(mod, vcov = vcovHC(mod, "HC1"))   # HC1 gives us the White standard errors
+flux_tn_by_field$resids <- mod$residuals
+flux.ols <- lm(log(resids^2) ~ log(total_n+.01)+field+season, data = flux_tn_by_field)
+flux_tn_by_field$varfunc <- exp(flux.ols$fitted.values)
+flux.gls <- lm(total_flux ~ total_n+field+season, weights = 1/sqrt(varfunc), data = flux_tn_by_field)
+g <- ggplot(data = flux_tn_by_field, aes(y = total_flux, x = total_n)) + geom_point(col = 'blue')
+g + geom_abline(slope = mod$coefficients[2], intercept = mod$coefficients[1], col = 'red') + geom_abline(slope = flux.gls$coefficients[2], intercept = flux.gls$coefficients[1], col = 'green')+
+  geom_smooth(slope = quad$coefficients[2], intercept = quad$coefficients[1], col = 'blue')
 
-###Figure 1. Average daily flux as function of nitrogen rate by field. Least squared quadratic regression
+summary(mod)
+summary(flux.gls)
+summary(quad)
+
+## field 1
+field1 <- filter(flux_tn_by_field,field == 1) %>% 
+  mutate(total_n2=total_n^2)
+mod <- lm(total_flux~total_n, data = field1)
+
+summary(mod)
+quadmod <- lm(total_flux~total_n+total_n2, data = field1)
+summary(quadmod)
+log <- lm(log(total_flux)~total_n+season, data = field1)
+summary(log)
+##
+ggplot(data = field1,aes(total_n,log(total_flux)))+
+  geom_point()+
+  stat_smooth()+
+  facet_grid(~season)
+plot(log)
+shapiro.test(log$residuals)
+## field 2
+field2 <- filter(flux_tn_by_field,field == 2) %>% 
+  mutate(total_n2=total_n^2)
+mod <- lm(total_flux~total_n, data = field2)
+summary(mod)
+quadmod <- lm(total_flux~total_n+total_n2, data = field2)
+summary(quadmod)
+##
+ggplot(data = field2,aes(total_n,total_flux))+
+  geom_point()+
+  stat_smooth()
+## field 3
+field3 <- filter(flux_tn_by_field,field == 3) %>% 
+  mutate(total_n2=total_n^2)
+mod <- lm(total_flux~total_n, data = field3)
+summary(mod)
+quadmod <- lm(total_flux~total_n+total_n2, data = field3)
+summary(quadmod)
+##
+ggplot(data = field3,aes(total_n,total_flux))+
+  geom_point()+
+  stat_smooth()
+## field 4
+field4 <- filter(flux_tn_by_field,field == 4) %>% 
+  mutate(total_n2=total_n^2)
+mod <- lm(total_flux~total_n, data = field4)
+summary(mod)
+quadmod <- lm(total_flux~total_n+total_n2, data = field4)
+summary(quadmod)
+##
+ggplot(data = field4,aes(total_n,total_flux))+
+  geom_point()+
+  stat_smooth()
+
+###Figure 1. Average daily flux as function of nitrogen rate by field. 
+#Least squared quadratic regression
 #Field 1 removed
 ggplot(data = filter(flux_tn, field != 1), aes(total_n,total_flux))+
   geom_point(aes(color = field), size = 6, alpha = .50) +
   geom_errorbar(aes(ymin=total_flux-se, ymax=total_flux+se), width=5,
                  position=position_dodge())+
+  #stat_smooth(method = "lm",
+  #            formula = y~x+I(x^2), se = F)+
   stat_smooth(method = "lm",
-              formula = y~x+I(x^2))+
+              formula = y~x, se = F)+
+  
               labs(x = expression("Average nitrogen rate (kg N"~~ha^{-1}~year^{-1}*")"))+ 
   labs(y = expression(Average~daily~flux~" "~(g~N[2]*O-N~ha^{-1}~day^{-1})), color='Field') +
   annotate("rect",xmin = 145,xmax = 200,ymin=-Inf,ymax=Inf, alpha=0.1, fill="blue")+
@@ -108,54 +220,46 @@ ggplot(data = filter(flux_tn, field != 1), aes(total_n,total_flux))+
          legend.box.background = element_rect(colour = "black"),
          strip.text.x = element_text(size = 20, colour = "black", face = "bold", angle = 0))
 
+full_plot <- function (z){
+  ggplot(data = filter(flux_tn, field == z), aes(total_n,total_flux))+
+  geom_point(aes(color = field), size = 6, alpha = .50) +
+  geom_errorbar(aes(ymin=total_flux-se, ymax=total_flux+se), width=5,
+                 position=position_dodge())+
+  #stat_smooth(method = "lm",
+  #            formula = y~x+I(x^2), se = F)+
+  stat_smooth(method = "lm",
+              formula = y~x, se = F)+
+  
+              labs(x = expression("Average nitrogen rate (kg N"~~ha^{-1}~year^{-1}*")"))+ 
+  labs(y = expression(Average~daily~flux~" "~(g~N[2]*O-N~ha^{-1}~day^{-1})), color='Field') +
+  annotate("rect",xmin = 145,xmax = 200,ymin=-Inf,ymax=Inf, alpha=0.1, fill="blue")+
+  annotate(geom = "text", x=200, y=0.1, label= ("r-squared = 0.83\np-value < 0.001"),size = 6)+
+   theme_bw() +
+   theme(axis.text.x  = element_text(size=20, colour="black"),  
+         axis.title.x = element_text(size = 20, vjust=-0.1, face = "bold"),
+         axis.text.y = element_text(size=20, colour="black"),
+         axis.title.y = element_text(vjust=1.8, size = 20, face = "bold"),
+         legend.text = element_text(size = 20),
+         legend.title = element_text("Field",size = 20),
+         legend.position = c(0.08, 0.85),
+         legend.background = element_blank(),
+         legend.box.background = element_rect(colour = "black"),
+         strip.text.x = element_text(size = 20, colour = "black", face = "bold", angle = 0))
+
+}
+
 #removing field 1
 flux_tn <- mutate(flux_tn, total_n2=total_n^2)
 mod <- lm(total_flux~total_n, data = filter(flux_tn, field != 1))
 summary(mod)
 quadmod <- lm(total_flux~total_n+total_n2, data = filter(flux_tn, field != 1))
 summary(quadmod)
+# residuals are normally distributed
+resids <- quadmod$residuals
+shapiro.test(resids)
+
 logmod <- lm(log(total_flux)~total_n, data = flux_tn)
 summary(logmod)
-
-linear <- lm(total_flux~total_n,data=flux_tn)
-quad_n <- lm(total_flux~total_n+I(total_n^2),data = flux_tn)
-
-log_n <- lm((log(total_flux)~total_n), data = flux_tn)
-poly_n <- lm(total_flux~total_n+I(total_n^2) + I(total_n^3),flux_tn)#cubic
-exp_n <- lm(total_flux~I(total_n^2), data = flux_tn)#exponential
-        
-new.data <- data.frame(total_n=seq(from=min(flux_tn$total_n),
-                                           to=max(flux_tn$total_n),
-                                                  length.out = 200))
-
-pred_lm <- predict(linear,newdata=new.data)
-pred_quad <- predict(quad_n,newdata=new.data)
-pred_poly <- predict(poly_n,newdata=new.data)
-pred_exp <- predict(exp_n,newdata=new.data)
-pred_log <- predict(log_n,newdata=new.data)
-preds <- data.frame(new.data,
-                    lm = pred_lm,
-                    quad= pred_quad,
-                    poly=pred_poly,
-                    exp=pred_exp)
-                    #log=pred_log)
-
-preds <- reshape2::melt(preds,
-                        id.vars=1)
-
-ggplot(data =preds) + 
-  geom_line(aes(x=total_n,y=value, color = variable))+
-  geom_point(data=flux_tn,aes(x = total_n, y = total_flux, color = field))
-summary(quad_n)
-summary(linear)
-summary(poly_n)
-summary(exp_n)
-plot(exp_n)
-
-summary(log_n)
-augment(exp_n) %>% 
-  arrange(-.cooksd)
-
 
 #season 1
 total_flux1 <- j %>%
@@ -310,5 +414,16 @@ ggplot(data = flux_tn3, aes(total_n,mean_flux, color = field))+
          legend.background = element_blank(),
          legend.box.background = element_rect(colour = "black"),
         strip.text.x = element_text(size = 20, colour = "black", face = "bold", angle = 0))
+  
+p$plot <- as.character(p$plot) 
+p1 <- p %>% 
+  filter(plot!="C"&plot!="P") %>% 
+  arrange(date,field, match(plot, c("0","25","50","75","100"),chamber)) %>% 
+  select(1,2,3,4,16)
+t_n1 <- select(t_n,1,2,7,8)
+t_n1$date <- as.Date(t_n1$date)
+p1$date <- as.Date(p1$date)
 
-          
+write.csv(p1, "C:/Users/twilli2/Dropbox/Lab data/S Willamette GWMA Dropbox/p1.csv")
+
+write.csv(t_n1, "C:/Users/twilli2/Dropbox/Lab data/S Willamette GWMA Dropbox/t_n1.csv")

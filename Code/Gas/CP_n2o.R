@@ -7,6 +7,12 @@ cp_n2o <- flux_data %>%
   filter(plot == "C" | plot == "P") %>% 
   filter(n2o_rsq > 0.1 & n2o_rsq < 1) %>% 
   rename(flux = n2o_flux) 
+mod <- lm(log(n2o_rsq)~as.factor(plot)+as.factor(season),data = cp_n2o)
+summary(mod)
+plot(mod)
+shapiro.test(mod$residuals)
+wilcox.test(n2o_rsq~as.factor(plot),data = cp_n2o)
+
 library(Rmisc)
 ?summarySE
 detach(Rmisc, unload = T)
