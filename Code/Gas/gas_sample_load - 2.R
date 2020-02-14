@@ -3611,3 +3611,4 @@ final_flux <- final_flux [-7]
 final_flux <- final_flux [-9]
 final_flux <- final_flux [-10]
 rm(c,id,n,r1,r2,r3,r4,s1,s2,s3,s4,x,y,z,final_flux1, final_flux2)
+write.csv(final_flux, "~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/raw_gas_slope_data.csv")

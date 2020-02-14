@@ -48,7 +48,27 @@ t_n <- t_n [-3]
 rm(df,fert_data,y1,y1a,y1b,y2,y2a,y2b)
 
 ##load gas sample and flux calc data
-j <- select(p,1,2,3,8,9,16)
+flux_data <- read.csv("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/flux_data.csv")
+n2oflux <- filter(flux_data, n2o_rsq >= 0.30 & n2o_rsq < 1, plot != "C" & plot != "P", n2o_flux>=0) %>%
+  group_by(season,date,field,plot) %>%
+  mutate(n2o_flux*2.4) %>% 
+  summarise(mean_flux = mean(n2o_flux), sd = sd(n2o_flux)) %>% 
+  arrange(match(plot, c("0","25","50", "75", "100")),-desc(field), -desc(date))
+
+n2oflux$plot <- factor(n2oflux$plot,levels = c("0","25","50", "75", "100"))
+n2oflux$season <- factor(n2oflux$season, levels = c("1","2"))
+n2oflux$date <- as.Date(n2oflux$date)
+
+n2oflux1 <- n2oflux %>%
+  filter(season==1) %>% 
+  group_by(field,plot) %>% 
+  mutate(cum_flux = cumsum(mean_flux)) 
+
+n2oflux2 <- n2oflux %>%
+  filter(season==2) %>% 
+  group_by(field,plot) %>% 
+  mutate(cum_flux = cumsum(mean_flux)) 
+j <- bind_rows(n2oflux1,n2oflux2)
 
 #makes sure names match
 j$plot[j$plot == "N0"] <- "0"
@@ -56,22 +76,21 @@ j$plot[j$plot == "N25"] <- "25"
 j$plot[j$plot == "N50"] <- "50"
 j$plot[j$plot == "N75"] <- "75"
 j$plot[j$plot == "N100"] <- "100"
-j$plot[j$plot == "Conv"] <- "C"
-j$plot[j$plot == "PA"] <- "P"
 
 #very little difference if
 #mean gradient flux by date and plot with abherrant slopes are removed
 #j <- filter(j, n2o_rsq >= 0.30 & n2o_rsq < 1 
 
 #creates tally for standard error calculations
-t <-   filter(j,plot != "C" & plot != "P") %>% 
-  group_by(field, plot, date, season) %>%
+t <-   filter(flux_data, n2o_rsq >= 0.30 & n2o_rsq < 1, plot != "C" & plot != "P", n2o_flux>=0) %>%
+  group_by(season,date,field,plot) %>% 
   tally() 
+t$plot <- factor(t$plot,levels = c("0","25","50", "75", "100"))
+t$season <- factor(t$season, levels = c("1","2"))
+t$date <- as.Date(t$date)
+
 #summarizes individual chamber flux data into average flux by plot
-j <-   filter(j,plot != "C" & plot != "P") %>% 
-  group_by(field, plot, date, season) %>%
-  summarise(mean_flux = mean(n2o_flux,na.rm = T),sd = sd(n2o_flux,na.rm = T)) %>% 
-  arrange(match(plot, c("0","25","50", "75", "100")),-desc(field), -desc(date))
+
 j <- left_join(j,t) 
 j <- j %>% 
   mutate(se = sd/sqrt(n))
@@ -83,14 +102,12 @@ j$season <- as.character(j$season)
 
 total_flux <- j %>%
   group_by(field,plot) %>% 
-  summarise(se = sum(se,na.rm=T)/492, total_flux = sum(mean_flux, na.rm=T)/492) %>% 
-  mutate(total_flux = total_flux*2.4)
+  summarise(se = sum(se,na.rm=T)/492, total_flux = sum(mean_flux, na.rm=T)/492)
 total_flux$field <- as.factor(total_flux$field)
 ##
 total_flux_by_field <- j %>%
   group_by(season,field,plot) %>% 
-  summarise(se = sum(se,na.rm=T)/246, total_flux = sum(mean_flux, na.rm=T)/246) %>% 
-  mutate(total_flux = total_flux*2.4)
+  summarise(se = sum(se,na.rm=T)/246, total_flux = sum(mean_flux, na.rm=T)/246)
 total_flux_by_field$field <- as.factor(total_flux_by_field$field)
 #average n addition per season #
 #multiplying to get kg/ha dividing by two seasons
@@ -99,7 +116,10 @@ total_n <- t_n %>%
   summarize(total_n = sum(total_n)) %>% 
   mutate(total_n = (total_n*1.12085)/2) 
 total_n$field <- as.factor(total_n$field)
+str(total_n)
+str(total_flux)
 flux_tn <- left_join(total_flux,total_n)
+
 ##
 total_n_by_field <- t_n %>% 
   group_by(season,field,plot) %>% 

@@ -6,7 +6,7 @@ library(lubridate)
 library(readxl)
 
 flux_data <- read.csv("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/flux_data.csv")
-n2oflux <- filter(flux_data, n2o_rsq >= 0.30 & n2o_rsq < 1, plot != "C" & plot != "P") %>%
+n2oflux <- filter(flux_data, n2o_rsq >= 0.30 & n2o_rsq < 1, plot != "C" & plot != "P", n2o_flux>=0) %>%
   group_by(season,date,field,plot) %>% 
   summarise(mean_flux = mean(n2o_flux)) %>% 
   arrange(match(plot, c("0","25","50", "75", "100")),-desc(field), -desc(date))
@@ -14,17 +14,17 @@ n2oflux <- filter(flux_data, n2o_rsq >= 0.30 & n2o_rsq < 1, plot != "C" & plot !
 n2oflux$plot <- factor(n2oflux$plot,levels = c("0","25","50", "75", "100"))
 n2oflux$season <- factor(n2oflux$season, levels = c("1","2"))
 n2oflux$date <- as.Date(n2oflux$date)
+n2oflux$mean_flux <- n2oflux$mean_flux*2.4
 n2oflux1 <- n2oflux %>%
   filter(season==1) %>% 
   group_by(field,plot) %>% 
   mutate(cum_flux = cumsum(mean_flux)) 
-n2oflux1$cum_flux <- n2oflux1$cum_flux*2.4  
 
 n2oflux2 <- n2oflux %>%
   filter(season==2) %>% 
   group_by(field,plot) %>% 
   mutate(cum_flux = cumsum(mean_flux)) 
-n2oflux2$cum_flux <- n2oflux2$cum_flux*2.4  
+
 
 fieldnames <- c("1"= "Field 1","2" = "Field 2","3" = "Field 3", "4" = "Field 4")
 
@@ -80,3 +80,4 @@ n_dates <- total_n %>%
   group_by(date, field) %>% 
   select(1,2)
 n_dates$cum_flux <- 0
+

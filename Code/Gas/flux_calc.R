@@ -206,6 +206,8 @@ sheet = "05-16-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-5-16", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-91,]
+f <- f[-91,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
@@ -219,6 +221,8 @@ sheet = "05-02-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-5-02", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
@@ -232,10 +236,11 @@ sheet = "4-18-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-4-18", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 f$temp <- as.numeric(f$temp)
 flux <- bind_rows(flux,f)
@@ -245,6 +250,8 @@ sheet = "4-4-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-4-4", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
@@ -271,6 +278,8 @@ sheet = "3-7-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-3-7", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
@@ -284,6 +293,8 @@ sheet = "2-21-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-2-21", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
@@ -297,6 +308,8 @@ sheet = "1-31-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-1-31", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
@@ -310,10 +323,11 @@ sheet = "1-18-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-1-18", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 f$temp <- as.numeric(f$temp)
 flux <- bind_rows(flux,f)
@@ -323,10 +337,11 @@ sheet = "1-2-18", skip = 16)
 f <- select(f,1,2,3,4,7,9,11,13,16)
 f$date=as.Date("2018-1-2", format = ("%Y-%m-%d"))
 f<- f[-1,]
+f <- f[-93,]
+f <- f[-93,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 f$temp <- as.numeric(f$temp)
 flux <- bind_rows(flux,f)
@@ -363,7 +378,6 @@ f<- f[-1,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = Plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 flux <- bind_rows(flux,f)
 ##
@@ -375,7 +389,6 @@ f<- f[-1,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 flux <- bind_rows(flux,f)
 ##
@@ -387,10 +400,8 @@ f<- f[-1,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "X__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 flux <- bind_rows(flux,f)
-##
 ##
 f <- read_excel("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Flux Data/Slopes and Flux.xls",
 sheet = "10-3", skip = 16)
@@ -407,7 +418,10 @@ flux$season <- 1
 flux <- bind_rows(flux,flux2)
 rm(f,flux2)
 ##
-s <- select(final_flux, date,field,plot,chamber,co2_slope,co2_rsq,n2o_slope,n2o_rsq, season)
+s<- read_csv("~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/raw_gas_slope_data.csv",
+col_types = cols(X1 = col_skip(), date = col_character()))
+
+s <- select(s, date,field,plot,chamber,co2_slope,co2_rsq,n2o_slope,n2o_rsq, season)
 s$plot[s$plot == "GN0"] <- "N0"
 s$plot[s$plot == "100"] <- "N100"
 s$plot[s$plot == "CNV"] <- "Conv"
@@ -418,6 +432,10 @@ s$plot[s$plot == "C"] <- "Conv"
 s$plot[s$plot == "P"] <- "PA"
 s$plot[s$plot == "25"] <- "N25"
 s$plot[s$plot == "0"] <- "N0"
+s$date <- as.Date(s$date)
+s$field <- as.character(s$field)
+s$plot <- as.character(s$plot)
+s$chamber <- as.character(s$chamber)
 
 p <- left_join(s,flux)
 p <- mutate(p,co2_flux = ((co2_slope*vol*atm*(12.011)*(60)*(1*10^-6))/(temp*area*(0.08206))))
@@ -430,5 +448,5 @@ p$plot[p$plot == "N100"] <- "100"
 p$plot[p$plot == "Conv"] <- "C"
 p$plot[p$plot == "PA"] <- "P"
 flux_data <- p
-rm(f,s,flux)
+rm(s,flux)
 write.csv(p,"~/Dropbox/Lab data/S Willamette GWMA Dropbox/Tidy Data/flux_data.csv")
