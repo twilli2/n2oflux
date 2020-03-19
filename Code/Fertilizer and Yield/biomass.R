@@ -5,7 +5,12 @@ biomass <- read_excel("~/Dropbox/GWMA CIG-ODA project/2019 Fescue harvest biomas
 sheet = "Sheet4")
 biomass <- rename(biomass = `biomass kg ha`, biomass)
 
-biomass <- filter(biomass,treatment == "Conv" | treatment == "EEF", season == 2) 
+plant_n_estimate_kg <- biomass %>% 
+  group_by(field, treatment) %>% 
+  summarise(mean_bm = mean(total_kg,na.rm = T)) %>% 
+  mutate(estimated_plant_n_kg = mean_bm * 0.04)
+
+biomass <- filter(biomass,treatment != "Conv" & treatment != "EEF") 
 biomass$field <- as.factor(biomass$field)
 biomass$treatment <- as.factor(biomass$treatment)
 cp_bio <- biomass %>%
@@ -15,7 +20,13 @@ cp_bio$field <- as.factor(cp_bio$field)
 cp_bio$treatment <- as.factor(cp_bio$treatment)
 #cp_bio$season[cp_bio$season == 1] <- "Season 1"
 #cp_bio$season[cp_bio$season == 2] <- "Season 2"
+grad_bio <- biomass %>%
+  group_by(field,treatment) %>% 
+  summarise(mean_seed = mean(seed_kg),mean_hay=mean(straw_kg),mean_total=mean(total_kg))
+grad_bio$field <- as.factor(grad_bio$field)
+grad_bio$treatment <- as.factor(grad_bio$treatment)
 
+biomass
 
 m1 <- lm(seed_kg~field*treatment,data = biomass)
 m2 <- lm(total_kg~field*treatment,data = biomass)

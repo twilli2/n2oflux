@@ -1,0 +1,19 @@
+lat,lon,site,,Soils:  https://websoilsurvey.sc.egov.usda.gov/App/WebSoilSurvey.aspx,Name,Number,Natural drainage class,"Available water storage (inches, per 60"" profile)",AWS [-]
+44.2593,-123.2046,L001,,,Salem gravelly silt loam,118,well drained,4.8,0.08
+44.1936,-123.1406,L002,,,Newberg loam,96,well drained,9.5,0.16
+44.1964,-123.1783,L003 | L013 | L014,,,Malabon silty clay loam,75,well drained,11.4,0.19
+44.1371,-123.1005,L005,,,Cloquato silt loam,29,well drained,11,0.18
+44.2062,-123.1503,L007,,,Newberg fine sandy loam,73,well drained,7.4,0.12
+44.52,-123.2397,L009 | L011 | L012,,,Chehalis silt loam,38,well drained,12.2,0.20
+44.3481,-123.2423,L010,,,McBee silty clay loam,67,moderately well drained,10.7,0.18
+44.1632,-123.07,L015,,,Coburg silty clay loam,31,moderately well drained,11,0.18
+44.2758,-123.287,L016,,,"Coburg silty clay loam, rarely flooded, 0 to 3 percent slopes",2025A,moderately well drained,10.5,0.18
+44.4252,-123.3104,L017,,,"Woodburn silt loam, 0 to 3 percent slopes",177,moderately well drained,12.2,0.20
+44.6342,-123.19,AgriMET,,,,,,,
+44.1278,-123.2206,Eugene Airport,,,,,,,
+44.42,-123.33,USCRN Corvallis,,,,,,,
+44.258188,-123.206745,RAREGW001,,,,,,,
+44.345017,-123.235936,RAREGW010,,,,,,,
+44.519823,-123.241008,RAREGW011,,,,,,,
+44.522744,-123.236327,RAREGW012,,,,,,,
+44.196478,-123.17301,RAREGW014,,,,,,,

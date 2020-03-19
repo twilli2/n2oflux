@@ -1,0 +1,1146 @@
+
+---
+title: "Notebook for PINE water balance calculations"
+output:
+  html_document:
+    code_folding: hide
+  html_notebook: default
+  pdf_document: default
+---
+
+## Author:  Laura Erban 
+## Started:  October, 2017
+
+### This notebook documents a procedure for estimating the water balance at PINE project fields, Willamette Valley, OR
+
+#### 1) Get daily precipitation data from PRISM
+[The PRISM data explorer](http://www.prism.oregonstate.edu/explorer/bulk.php) allows bulk downloads of daily point data (up to 500 locations and 6 months).  Data aquisition can be automated with R package 'prism', but it requires downloading the full daily grids.  The bulk download of point data is more straightforward at this time.  Eight files cover the period 2014-2017 in 6 month intervals.  File names are organized as: "PRISM_ppt_datacondition_4km_YYYYMMDD_YYYYMMDD" where "data condition" is one of "stable", "provisional" or "early" and the dates are start and end, respectively.
+
+#### 2) Get daily reference ET data and crop curves from AgriMET 
+[AgriMET data](https://www.usbr.gov/pn/agrimet/webarcread.html) for the Corvallis, OR station (CRVO) provide daily reference evapotranspiration (ETr) values and crop coefficients (Kc).  AgriMET also provides [daily ET summaries for all crops](https://www.usbr.gov/pn/agrimet/etsummary.html?station=crvo&year=2017) grown in the vicinity of the station.  However, planting schedules at PINE sites may deviate from those used by AgriMET.  We can replicate their procedure by using the alfalfa reference ET, and interpolating the position of each of our crops along the AgriMET crop curve (i.e., 21 values of Kc for 0 to 200% of the growth stage).  See [this page](https://www.usbr.gov/pn/agrimet/cropcurves/about_crop_curves.html) for more details. 
+
+#### 3) Load R packages
+```{r, warning = FALSE, message = FALSE}
+library(here)
+library(leaflet)
+library(zoo)
+library(reshape2)
+library(lubridate)
+library(tidyverse)
+```
+
+#### 4) Read in the data and parameters
+```{r, message = FALSE, warning = FALSE}
+
+# ---------- precipitation ----------------
+
+# specify a path to the precipitation data files, which must be in a folder with no other files
+p <- here::here("data", "PRISM")
+prcp <- list()
+
+# create a function to merge the precipitation data files
+multmerge <- function(mypath){
+  filenames <- list.files(path = mypath, full.names=TRUE)
+  datalist <- lapply(filenames, function(x){read.csv(file = x, header = TRUE, skip = 10, stringsAsFactors = FALSE)})
+  prcp <- do.call(rbind, datalist)
+  return(prcp)
+}
+
+# merge precipitation and remove unnecessary variables
+prcp <- multmerge(p) 
+names(prcp) <- c("Site", "Lon", "Lat", "Elev", "Date", "ppt_mm")
+prcp  <- subset(prcp, select = -c(Lon, Lat, Elev))
+
+# separate fields in the same PRISM grid cell
+p1 <- prcp %>%
+  mutate(SiteNum = as.numeric(substr(Site, 3, 4))) %>%
+  arrange(SiteNum, Date) %>%
+  mutate(Date = as.Date(Date)) %>%
+  mutate(jday = as.numeric(julian(Date))) %>%
+  mutate(SiteName = substr(Site, 1, 4))
+  
+p2 <- p1 %>%
+  mutate(SiteNum = as.numeric(substr(Site, 7, 8))) %>%
+  filter(!is.na(SiteNum)) %>%
+  mutate(SiteName = substr(Site, 5, 8))
+
+p3 <- p1 %>%
+  mutate(SiteNum = as.numeric(substr(Site, 11, 12))) %>%
+  filter(!is.na(SiteNum)) %>%
+  mutate(SiteName = substr(Site, 9, 12))
+
+# recombine all fields and arrange by site and date
+prcp <- rbind(p1, p2, p3) %>%
+  arrange(SiteNum, Date) 
+
+prcp_sum <- prcp %>%
+  select(c(Site, Date, ppt_mm))%>%
+  mutate(year = as.numeric(format(Date, "%Y"))) %>%
+  mutate(month = as.numeric(format(Date, "%m"))) %>%
+  group_by(Site, year, month) %>%
+  summarise(ppt_mm = sum(ppt_mm))%>%
+  group_by(year, month) %>%
+  summarise(ppt_mm = mean(ppt_mm))
+
+# --------- evapotranspiration ----------------
+
+# specify a path to the reference evapotransipiration data file
+p <- here::here("data", "Crop_ET", "daily_data.csv")
+
+et <- read.csv(p, header = TRUE, skip = 13, stringsAsFactors = FALSE)
+et$DATE <- as.Date(et$DATE, format = '%m/%d/%Y')
+
+# select reference ET (ETr, method of ASCE-EWRI) for alfalfa and grass and convert inches --> mm
+cf <- 25.4
+et <- et %>%
+  select(DATE) %>%
+  mutate(ETr_alfalfa_mm = as.numeric(et$CRVO.ETRS)*cf) %>%
+  mutate(ETr_grass_mm = as.numeric(et$CRVO.ETOS)*cf) 
+
+colnames(et)[1] <- "Date"
+
+# ---------- AgriMet crop water use -------------
+
+# 2014
+p <- here::here("data", "Crop_ET", "crvo14et.txt")
+e1 <- read.table(p, header = TRUE, skip = 3, stringsAsFactors = FALSE)
+e1 <- e1[-c(1),] %>%
+  mutate(Date = as.Date(paste0(DATE,"/2014"), format = '%m/%d/%Y'))
+e1[,2:ncol(e1)-1] <- as.data.frame(lapply(e1[,2:ncol(e1)-1], as.numeric))
+
+# 2015
+p <- here::here("data", "Crop_ET", "crvo15et.txt")
+e2 <- read.table(p, header = TRUE, skip = 3, stringsAsFactors = FALSE)
+e2 <- e2[-c(1),] %>%
+  mutate(Date = as.Date(paste0(DATE,"/2015"), format = '%m/%d/%Y'))
+e2[,2:ncol(e2)-1] <- as.data.frame(lapply(e2[,2:ncol(e2)-1], as.numeric))
+
+# 2016
+p <- here::here("data", "Crop_ET", "crvo16et.txt")
+e3 <- read.table(p, header = TRUE, skip = 2, stringsAsFactors = FALSE)
+e3 <- e3[-c(1),] %>%
+  mutate(Date = as.Date(paste0(DATE,"/2016"), format = '%m/%d/%Y'))
+e3[,2:ncol(e3)-1] <- as.data.frame(lapply(e3[,2:ncol(e3)-1], as.numeric))
+
+# 2017
+p <- here::here("data", "Crop_ET", "crvo17et.txt")
+e4 <- read.table(p, header = TRUE, skip = 2, stringsAsFactors = FALSE)
+e4 <- e4[-c(1),] %>%
+  mutate(Date = as.Date(paste0(DATE,"/2017"), format = '%m/%d/%Y'))
+e4[,2:ncol(e4)-1] <- as.data.frame(lapply(e4[,2:ncol(e4)-1], as.numeric))
+
+# select crops and set non-reporting days to zero
+e <- bind_rows(e1,e2,e3,e4)
+e <- subset(e, select = c(Date, LAWN, GRSD, BLUB, WGRN, PPMT, PEAS, SPNC, SQSH, CBBG, HZLN))
+names(e) <- c("Date", "LAWN", "GRASS SEED", "BLUEBERRIES", "WNTR GRN", "PPMT", "PEAS", "SPNC", "SQUASH", "CABBAGE", "HAZELNUT")
+e <- melt(e, id.var = 'Date', variable.name = 'Cover', value.name = "AgriMET_ET")
+e[is.na(e)] <- 0
+
+# convert to mm
+e$AgriMET_ET <- e$AgriMET_ET*cf
+e$Cover <- as.character(e$Cover)
+
+rm(e1,e2,e3,e4)        
+
+# ------------ crop coefficients -----------------
+
+p <- here::here("data", "Crop_ET", "crop_coeff.csv")
+cc <- read.csv(p, header = FALSE, skip = 3, stringsAsFactors = FALSE)
+cc <- cc[,2:23]
+
+# ------------- crop schedules ------------------
+
+p <- here::here("data", "Crop_ET", "crop_sched_gaps_SLP.csv")
+cs <- read.csv(p, header = TRUE, stringsAsFactors = FALSE)
+cs$SiteNum <- as.numeric(substr(cs$Site, 3, 4))
+cs$Date <- as.Date(cs$Date, format = '%m/%d/%Y')
+cssum <- cs %>% group_by(SiteNum) %>% summarise(sched = paste(unique(Cover), collapse = "|"))
+
+# adjustments to crop schedule for continuous Kc calculations
+cs$Crop[100:101] <- "HAYP"
+cs$Growth[100] <- "emergence"
+cs$Date[69] <- "2014-01-01"
+cs <- cs[-92, ] 
+cs$Crop[which(cs$Growth == "planted")] <- "BARE"
+
+# ------------ irrigation -----------------------
+
+p <- here::here("data", "Irrigation_SoilMoisture_Leaching", "irrigation_months.csv")
+ir <- read.csv(p, header = TRUE, stringsAsFactors = FALSE) 
+ir$SiteNum <- as.numeric(substr(ir$Site, 3, 4))
+ir$month <- as.numeric(ir$month)
+ir$year <- as.numeric(ir$year)
+ir  <- subset(ir, select = -c(Site))
+ir[is.na(ir)] <- -999
+names(ir) <- c('year', 'month', 'I_mm', 'SiteNum')
+ir <- ir %>% mutate(I_mm_d = I_mm/30)
+
+# ----------- soil moisture --------------------
+
+p <- here::here("data", "Irrigation_SoilMoisture_Leaching", "soil_moisture.csv")
+sm <- read.csv(p, header = TRUE, stringsAsFactors = FALSE)
+sm$SiteNum <- as.numeric(substr(sm$Site, 3, 4))
+sm$soil_moisture <- as.numeric(substr(sm$soil_moisture, 1, 5))
+sm$temp_C <- as.numeric(gsub( " .*$", "", sm$temp_C))
+sm$time <- sub(".*? (.+)", "\\1", sm$Date)
+sm$Date <- as.Date(gsub( " .*$", "", sm$Date), "%m/%d/%y")
+
+# remove duplicate measurements on same day that appear to be too low
+sm <- sm[-c(which(duplicated(sm[c(1,2)]))-1), ] 
+
+# filter for decagon measurements
+sm <- sm %>% filter(probe == "5TM Moisture/Temp")
+
+# remove soil moisture spikes in tile-drained field
+i <- which(sm$SiteNum == 16 & sm$soil_moisture > 0.4)
+sm <- sm[-i, ]
+
+# format time
+sm$datetime <- ymd_hm(paste(sm$Date, sm$time), tz = "America/Los_Angeles")
+
+# -------------- leaching ------------------
+
+p <- here::here("data", "Irrigation_SoilMoisture_Leaching", "PCAPS_leaching.csv")
+lea <- read.csv(p, header = TRUE, stringsAsFactors = FALSE) 
+lea$PCAPS_Date <- as.Date(lea$PCAPS_Date, format = '%m/%d/%Y')
+lea$SiteNum <- as.numeric(substr(lea$Site, 3, 4))
+lea$PCAPS1_mm <- as.numeric(lea$PCAPS1_mm)
+
+# ---------- groundwater levels -------------
+
+p <- here::here("data", "Other", "RARE_WellData_Summary.csv")
+gw <- read.csv(p, header = TRUE, stringsAsFactors = FALSE) 
+gw$Date <- as.Date(gw$Date, format = '%d-%b-%y')
+gw$SiteNum <- as.numeric(substr(gw$Well, 4,5))
+gw$DTW_mm <- gw$DTW_ft *304.8
+
+# remove old variables
+rm(p, p1, p2, p3, cf)
+
+# join atmospheric datasets 
+atm <- left_join(prcp, et, by = "Date") 
+
+```
+
+#### 5) Estimate daily ET for each field cover condition
+
+##### 5.1 calculate daily crop coefficients (Kc) for planted fields using AgriMET crop curves
+
+```{r, message = FALSE, warning = FALSE}
+
+# ------ first, planted fields ----------
+
+Kc <- list()
+for (i in 1:(nrow(cs)-1)){
+  
+  # determine crop and select crop coefficient data to use
+  crop <- cs$Crop[i]
+  crop_cc <- as.numeric(cc[match(crop, cc$V23), 1:21])
+  
+  # set Kc to zero when no crop curve is available
+  if (is.na(max(crop_cc))){
+    crop_cc <- rep(0, 21)
+    crop_cc[-1] <- 0.001
+  }
+  
+  # determine growth stage 
+  growth <- cs$Growth[i]
+  
+  # determine julian days between now and the next date in the crop schedule
+  t1 <- julian(cs$Date[i])[1]
+  t2 <- julian(cs$Date[i+1])[1] - 1
+  
+  # specify which julian days to interpolate
+  if (t2 > t1 && !is.na(crop)){
+  
+    xout <- seq(t1, t2, 1)
+  
+    # create a list of crop names and site numbers to merge with Kc estimates
+    Crop <- rep(crop, length(xout))
+    Cover <- rep(crop, length(xout))
+    site <- rep(cs$SiteNum[i], length(xout))
+  
+    # interpolate along crop curve between changes in field cover 
+    if (growth == "emergence"){
+      # -- emergence to peak --
+      y <- crop_cc[1:which.max(crop_cc)]
+      x <- round(seq(t1,t2, length.out = length(y)))
+      yout <- approx(x,y,xout)$y
+    }else if (growth == "peak"){
+      # -- peak to harvest --
+      y <- crop_cc[which.max(crop_cc):21]
+      x <- round(seq(t1,t2, length.out = length(y)))
+      yout <- approx(x,y,xout)$y
+    }else if (growth == "harvest"){  
+      # -- interpolate between last and first points on crop curve --
+      y <- c(crop_cc[21], crop_cc[1])
+      x <- c(t1,t2)
+      yout <- approx(x,y,xout)$y
+    }else if (growth == "grass harvest"){  
+      # -- set grass Kc back to 80% of peak after harvest --
+      y <- c(0.69, crop_cc[1])
+      x <- c(t1,t2)
+      yout <- approx(x,y,xout)$y
+    }else if (growth == "ppmt harvest"){
+      # -- set peppermint back to 45% of peak after harvest --
+      y <- c(0.43, crop_cc[1])
+      x <- c(t1,t2)
+      yout <- approx(x,y,xout)$y
+    }else{
+      # -- bare ground case, set to zero until bare ground calculations (below) --
+      y <- c(0,0)
+      x <- round(seq(t1,t2, length.out = length(y)))
+      yout <- approx(x,y,xout)$y
+    }
+    
+    Kc[[i]] <- data.frame(jday = xout, Kc = yout, Cover = Cover, SiteNum = site)
+  }
+}
+
+Kc <- do.call(rbind, Kc)
+Kc$Cover <- as.character(Kc$Cover)
+
+```
+
+##### 5.2 calculate bare ground Kc and assign reference ET (ETr)
+```{r, warning = FALSE, message = FALSE}
+
+# first some house-keeping
+data <- left_join(atm, Kc)
+
+a <- data[duplicated(data[c(2,4)]),]
+if (nrow(a) > 0){ print("Warning: duplicate field days")}
+
+rm(Kc, atm, Cover, crop, crop_cc, growth, i, site, t1, t2, x, y, xout, yout)
+
+# AgriMET crop coefficients are for use with alfalfa reference ET, per website
+data$ETr <- data$ETr_alfalfa_mm
+
+# get average reference grass ET over past 14 days
+data$ETr_grass_mm[is.na(data$ETr_grass_mm)] <- -999
+eta <- rollmean(data$ETr_grass_mm, 14, align = "right", fill = NA)
+eta[eta < 0] <- NA
+
+# calculate interval between significant rainfall (If)
+data$If <- NA
+Kci <- rep(NA, nrow(data))
+
+n <- 0
+for (i in 1:nrow(data)){
+  
+  cover <- data$Cover[i]
+  
+  # calculate rainfall intervals.  start counting at 1 if precip > 1mm occurred, else keep counting (days). 
+  if (data$ppt_mm[i] > 1){
+    n <- 1
+  }else{
+    n <- n + 1
+  }
+  
+  data$If[i] <- n
+ 
+  if (!is.na(cover) && cover == "BARE"){
+    # calculate Kci
+    if (n < 4){
+      K <- (1.286 - 0.27*log(n))*exp((-0.01 - 0.042*log(n))*eta[i])
+    }else{
+      K <- 2*n^(-0.49)*exp((-0.02 - 0.04*log(n))*eta[i])
+    }
+    data$Kc[i] <- K  
+  }
+}
+
+# fill in any missing Kc and filter out 2013 dates 
+data <- data %>% group_by(Site) %>% fill(Kc) %>% ungroup() %>% filter(jday > 16070)
+
+rm(cover, eta, i, K, Kci, n)
+```
+
+##### 5.3 calculate daily ET as the product of Kc and ETr
+```{r, message = FALSE}
+data$ETr_grass_mm[which(data$ETr_grass_mm < 0)] <- NA
+data$ETr[which(data$ETr < 0)] <- NA
+data$ET <- data$ETr * data$Kc
+```
+
+##### 5.4 join AgriMET crop water use for comparison
+```{r, message = FALSE}
+
+# rename some variables
+old <- c("WGRN", "BLUEGRASS_E", "HAYP", "SQSH", "HZLN")
+new <- c("WNTR GRN", "LAWN", "LAWN", "SQUASH", "HAZELNUT")
+
+for (i in 1:length(new)){
+  data$Cover[data$Cover == old[i]] <- new[i]
+}
+
+data <- left_join(data, e)
+```
+
+##### 5.5 bring in Decagon soil moisture measurements
+
+```{r, message = FALSE}
+data  <- subset(data, select = -c(Site, jday)) %>% mutate(month = as.numeric(format(Date, "%m")))
+data <- left_join(data, sm)
+
+# drop unnecessary columns
+data <- subset(data, select = -c(probe, temp_C, time))
+
+a <- data %>%
+  select(Date, SiteNum, soil_moisture) %>%
+  filter(!is.na(soil_moisture)) %>%
+  group_by(SiteNum) %>%
+  mutate(dsm = c(NA, (soil_moisture[2:n()] - soil_moisture[1:n()-1])))
+
+```
+
+#### 6) Summarize water balance terms by month and field 
+
+##### 6.0 bring in PCAPS data and determine sample intervals
+```{r, message = FALSE, warnings = FALSE}
+a <- c(1,2,3,5,7,9,10,11,12,13,14,15,16,17)
+
+pc <- lea %>% filter(SiteNum %in% a)
+pc <- pc[, c(2,5,3,4)]
+
+# indicator for PCAPS measurement
+pc$samp <- 1
+names(pc) <- c("Date", "SiteNum", "PCAPS1_mm", "PCAPS2_mm", "Sample")
+
+# interpolate soil moisture over reasonable gap periods
+dp <- data %>%
+  filter(SiteNum %in% a) %>%
+  group_by(SiteNum) %>%
+  mutate(soil_moisture = na.approx(soil_moisture, maxgap = 60, na.rm = FALSE)) 
+
+# join PCAPS measurements to rest of the data
+dp <- left_join(dp, pc)
+
+# add sample intervals to sites without PCAPS
+i <- which(dp$SiteNum %in% c(9,10,11,12,13,14,15,16,17))
+j <- dp$Date[i]
+k <- dp$Sample[i]
+
+# get PCAPS sample dates and use for basis of intervals w/out PCAPS
+z1 <- unique(pc$Date)[1:47]         # careful to exclude PCAPS dates in same month (apr and nov)
+z2 <- which(j %in% z1)
+k[z2] <- 1
+dp$Sample[i] <- k
+  
+# create a dummy variable (pc_int) for summing water balance terms between PCAPS sample dates
+dp$pc_int <- NA
+n <- 1
+s <- 1
+for (i in 1:nrow(dp)){
+  
+  # start new interval if site changes
+  if(dp$SiteNum[i] > s){
+    n <- n+1
+  }
+  
+  dp$pc_int[i] <- n 
+  
+  # start new interval if a new sample is taken
+  if (!is.na(dp$Sample[i])){
+    n <- n+1
+  }
+
+  s <- dp$SiteNum[i]
+}
+
+rm(i,j,k,z1,z2)
+```
+
+##### 6.1 gap-fill ET
+```{r, message = FALSE, warning = FALSE }
+
+# use AgriMET crop water use for cover types without crop coefficients 
+i <- which(dp$Cover == "HAZELNUT")  
+dp$ET[i] <- dp$AgriMET_ET[i]
+for (d in i){
+  if (dp$ET[d] == 0 | is.na(dp$ET[d])){
+    dp$ET[d] <- dp$ETr[d] * 0.25
+  }
+}
+
+i <- which(dp$Cover == "SQUASH")
+dp$ET[i] <- dp$AgriMET_ET[i]
+for (d in i){
+  if (dp$ET[d] == 0 | is.na(dp$ET[d])){
+    dp$ET[d] <- dp$ETr[d] * 0.25
+  }
+}
+
+# fallow field (wetland-like)
+i <- which(dp$SiteNum == 17)  
+dp$ET[i] <- dp$ETr_grass_mm[i]
+
+# reduce reference ET for bare fields 
+a <- dp$ET + ((dp$ETr - dp$ET) * 0.5)
+i <- which(dp$Cover == "BARE")
+dp$ETr[i] <- a[i]
+
+# create a smaller dataframe to work with
+datasum  <- subset(dp, select = c(Date, ppt_mm, SiteNum, SiteName, ET, ETr, soil_moisture, datetime, PCAPS1_mm, PCAPS2_mm, Sample, pc_int)) %>% ungroup()
+
+# create dummy non-NA sample for first day of study period
+i <- which(datasum$Date %in% as_date("2014-01-01"))
+datasum$Sample[i] <- 0
+
+```
+
+##### 6.2 bring in soil moisture (Sentek) data from Tingey National Forest plots
+```{r, message = FALSE, warning = FALSE}
+
+# bring in and reformat the TNF data
+p <- here::here("data", "Irrigation_SoilMoisture_Leaching", "TNF_soil_moisture", "TNF_Sentek_Data.csv")
+tnf <- read.csv(p, header = TRUE, stringsAsFactors = FALSE)
+tnf <- tnf[, c(1,22:37)]
+names(tnf) <- c("DateTime","S20cm","S30cm","S40cm","S50cm","S60cm","S100cm","S150cm","S200cm","N20cm","N30cm","N40cm","N50cm","N60cm","N100cm","N150cm","N200cm")
+
+# reformat day, time, datetime
+tnf$time <- sub(".*? (.+)", "\\1", tnf$DateTime)
+tnf$day <- as.Date(gsub( " .*$", "", tnf$DateTime), "%m/%d/%Y")
+tnf$datetime <- ymd_hm(paste(tnf$day, tnf$time), tz = "America/Los_Angeles")
+tnf <- tnf %>% select(datetime, S20cm:N200cm) 
+
+# join PINE and TNF by nearest datetime PCAPS sample dates / intervals only)
+a <- subset(datasum, select = c(SiteName, SiteNum, datetime, soil_moisture, Date, Sample)) %>% filter(!is.na(Sample))
+a$datetime <- round_date(a$datetime, unit = "hour")
+i <- which(is.na(a$datetime))
+a$datetime[i] <- ymd_hms(paste(a$Date[i], "11:00:00", sep = " "), tz = "America/Los_Angeles")
+
+# select TNF data >= 100cm and convert from percent to [-]
+b <- tnf %>% select(datetime:S100cm, N20cm:N100cm)
+
+# convert to [-]
+b[,c(2:13)] <- b[,c(2:13)]/100
+
+# select TNF data at PINE sample datetimes by joining
+a <- left_join(a,b)
+a <- a[!duplicated(a),]
+a$Date <- as_date(a$datetime)
+
+## calculate change in soil moisture (all depths, all sites) between readings
+asub <- a[, c(4, 7:18)]
+
+# calculate mean change in soil moisture over complete column as depth interval weighted average
+dz <- c(25,10,10,10,20,25)
+S <- t(asub[,2:7])*dz
+S_avg <- as.numeric((colSums(S)/100))
+N <- t(asub[,8:13])*dz
+N_avg <- as.numeric((colSums(N)/100))
+
+# join changes at 100cm (PINE and TNF) and estimate dS for full profile (TNF)
+sm2 <- data.frame(cbind(asub$soil_moisture, asub$N100cm, asub$S100cm, N_avg, S_avg))
+colnames(sm2) <- c("PINE_sm", "N100sm", "S100sm", "N_sm", "S_sm")
+
+# join soil moisture changes with PINE site info
+info <- subset(a, select = c(SiteName, SiteNum, datetime))
+sm2 <- cbind(info, sm2)
+sm2$Date <- as_date(sm2$datetime)
+
+# calculate changes in soil moisture at 1m and full profile
+dsm2 <- sm2
+dsm2[2:nrow(dsm2), 4:8] <- sm2[2:nrow(sm2), 4:8] - sm2[1:(nrow(sm2)-1), 4:8] 
+i <- which(dsm2$Date %in% as_date("2014-01-01"))
+dsm2[i,4:8] <- NA
+
+# calculate average conditions for TNF sites at 1m
+dsm2 <- dsm2 %>%
+  rowwise() %>%
+  mutate(NSavg = mean(c(N100sm,S100sm), na.rm = TRUE)) %>%
+  mutate(Ndif = N_sm - N100sm) %>%
+  mutate(Sdif = S_sm - S100sm) %>%  
+  mutate(month = as.numeric(format(datetime, "%m"))) %>%
+  mutate(year = as.numeric(format(datetime, "%Y")))
+
+# select summary variables and join with other data
+b <- subset(dsm2, select = c(SiteName, SiteNum, Date, NSavg))
+
+# join TNF with rest of data
+datasum <- left_join(datasum, b)
+
+# consider ratio o dS in full profile to dS at 1m, for all months or fall wet-up only (remove comments)
+a <- dsm2 %>% 
+  filter(SiteNum == 1) %>%
+  mutate(month = as.numeric(format(datetime, "%m")))%>%
+  #filter(month > 8) %>%
+  #filter(N100sm > 0 | S100sm > 0) %>%
+  select(datetime:S_sm) %>%
+  mutate(Nratio = N_sm/N100sm, Sratio = S_sm/S100sm) %>%
+  rowwise() %>%
+  mutate(maxRatio = max(Nratio, Sratio))
+
+ a$month <- as.numeric(format(a$datetime, "%m")) 
+a %>% group_by(month) %>% summarize(m = mean(maxRatio, na.rm = TRUE))
+
+rm(asub, b, dz, S, S_avg, N, N_avg, info)
+```
+
+##### 6.3 summarize data by site and sampling interval
+```{r, message = FALSE, warnings = FALSE}
+# join crop schedule summary
+datasum <- left_join(datasum, cssum)
+
+# summarize data by site and sampling interval
+dp_sum <- datasum %>% 
+  group_by(SiteNum, pc_int) %>%
+  mutate(ET = na.approx(ET, na.rm = FALSE)) %>%
+  mutate(ETr = na.approx(ETr, na.rm = FALSE)) %>%
+  summarise(Date = median(Date), Site = unique(SiteName), Cover = first(sched), P_mm = sum(ppt_mm), ET_mm = sum(ET), ETr_mm = sum(ETr), dS_mm = 1000*(last(soil_moisture) - first(soil_moisture)), PCAPS1_mm = max(PCAPS1_mm, na.rm = TRUE), PCAPS2_mm = max(PCAPS2_mm, na.rm = TRUE), days = n(), dS_NSavg_mm = 1000*last(NSavg))  %>%
+  mutate(month = as.numeric(format(Date, "%m"))) %>%
+  mutate(year = as.numeric(format(Date, "%Y"))) 
+
+dp_sum[dp_sum == -Inf] <- NA
+
+# calculate irrigation  
+dp_sum <- left_join(dp_sum, ir)
+
+# for periods of given irrigation rates
+i <- which(dp_sum$I_mm > 0)
+dp_sum$I_mm[i] <- dp_sum$I_mm_d[i] * dp_sum$days[i]
+
+# for periods of unknown irrigation rates, use deficit (i.e., ET-P), when it is positive
+def <- (dp_sum$ET_mm - dp_sum$P_mm)
+def[def<0] <- 0
+
+i <- which(dp_sum$I_mm == -999)
+dp_sum$I_mm[i] <- def[i]
+
+# periods without irrigation
+i <- which(is.na(dp_sum$I_mm))
+dp_sum$I_mm[i] <- 0
+
+# fix period on L003 when water balance indicates that ET is much too low (b/c significant drainage predicted in summer period with no P or I)
+dp_sum$ET_mm[139] = 90
+
+```
+
+##### 6.4 estimate change in soil moisture during unmonitored periods
+```{r}
+# calculate median ratio between change in soil moisture at PINE (@ 1m) versus TNF plots (average of N & S sites at 1m)
+a <- dp_sum %>%
+  group_by(SiteNum) %>%
+  summarize(Sratio = median(dS_mm/dS_NSavg_mm, na.rm = TRUE)) 
+
+# for sites with no PINE data, use median of median ratios
+i <- which(is.na(a$Sratio))
+a$Sratio[i] <- median(a$Sratio, na.rm = TRUE)
+
+# fill gaps in PINE site soil moisture change @1m using median ratio
+dp_sum$dS_mm_fill <- dp_sum$dS_mm
+gaps <- which(is.na(dp_sum$dS_mm))
+for (i in 1:length(gaps)){
+  
+  j <- gaps[i]
+  site <- dp_sum$SiteNum[j]
+  ratio <- a$Sratio[a$SiteNum == site]
+  dp_sum$dS_mm_fill[j] <- dp_sum$dS_NSavg_mm[j] * ratio
+  
+}
+
+# on two winter/spring dates, TNF filli creates positive dS when most PINE observations are negative, or near 0.  Reset to 0
+a <- dp_sum %>% filter(Date == "2017-02-24" | Date == "2017-04-21") %>%
+  filter(is.na(dS_mm)) %>%
+  select(Site, Date, pc_int, P_mm, dS_mm, dS_mm_fill)
+
+# find indices where above conditions are true, and reset dS estimate to 0
+i <- which(dp_sum$pc_int %in% a$pc_int)
+dp_sum$dS_mm_fill[i] = 0
+
+rm(gaps)
+```
+
+##### 6.5 estimate drainage
+```{r, message = FALSE, warnings = FALSE}
+# estimate expected drainage (mm and mm per day) 
+dp_sum <- dp_sum %>%
+  ungroup() %>%
+  mutate(D_mm = P_mm - ET_mm + I_mm - dS_mm_fill) %>%
+  mutate(D_mm_d = D_mm / days) 
+
+# estimate observed drainage rate (mm per day)
+dp_sum <- dp_sum %>%
+ mutate(PCAPS1_mm_d = PCAPS1_mm / days) %>%
+ mutate(PCAPS2_mm_d = PCAPS2_mm / days)
+
+```
+
+##### 6.6 estimate drainage uncertainty
+```{r, message = FALSE, warnings = FALSE}
+p <- here::here("data", "Other", "PRISM_uncertainty.csv")
+prism_pi70 <- read.csv(p, header = TRUE, skip = 1)
+perr <- subset(prism_pi70, select = c(Month, PI70_mm_day))
+perr$Month <- as.numeric(perr$Month)
+names(perr) <- c("month", "pi70_mm_d")
+
+# estimate precipitation uncertainty as PI70 (mm/d) (from Daly et al., 2008) times days in PINE sampling intervals
+dp_sum <- left_join(dp_sum, perr)
+dp_sum <- dp_sum %>% 
+  mutate(perr = days*pi70_mm_d)%>%
+  mutate(phi = P_mm+perr) %>%
+  mutate(plo = P_mm-perr) 
+
+# set negative precipitation to zero
+dp_sum$plo[dp_sum$plo<0] <- 0
+
+# estimate uncertainty in dS by doubling, unless that value exceeds precip
+dp_sum$dS_mm_max = dp_sum$dS_mm_fill * 2
+
+# find non-irrigated cases where dS_max > P, and set to P
+i <- which(dp_sum$dS_mm_max > dp_sum$P_mm & dp_sum$I_mm == 0)
+dp_sum$dS_mm_max[i] = dp_sum$P_mm[i]
+
+# find irrigated cases where dS_max > I + P, and set to I + P
+i <- which(dp_sum$dS_mm_max > (dp_sum$I_mm + dp_sum$P_mm) & dp_sum$I_mm > 0)
+dp_sum$dS_mm_max[i] = (dp_sum$P_mm[i] + dp_sum$I_mm[i])
+
+# estimate min and max drainage by water balance, for non-irrigated fields
+dp_sum <- dp_sum %>%
+  mutate(D_min_mm = (plo) - (ET_mm) - (dS_mm_max)) %>%
+  mutate(D_max_mm = (phi) - (ET_mm * 0.5) - (dS_mm_fill))
+
+# estimate min and max drainage for irrigated fields
+i <- which (dp_sum$I_mm > 0)
+dp_sum$D_min_mm[i] = (dp_sum$plo[i]) - (dp_sum$ET_mm[i]) + (dp_sum$I_mm[i]*0.75) - (dp_sum$dS_mm_fill[i])
+dp_sum$D_max_mm[i] = (dp_sum$phi[i]) - (dp_sum$ET_mm[i]) + (dp_sum$I_mm[i]*1.25) - (dp_sum$dS_mm_fill[i])
+
+# prevent min drainage from exceeding estimated drainage
+i <- which(dp_sum$D_mm < dp_sum$D_min_mm)
+dp_sum$D_min_mm[i] <- dp_sum$D_mm[i]
+
+# set negative drainge estimates to zero
+i <- which(dp_sum$D_mm < 0)
+dp_sum$D_mm[i] <- 0
+i <- which(dp_sum$D_min_mm < 0)
+dp_sum$D_min_mm[i] <- 0
+i <- which(dp_sum$D_max_mm < 0)
+dp_sum$D_max_mm[i] <- 0
+
+# set drainage to zero when P & I = 0 and dS < 0
+i <- which(dp_sum$P_mm == 0 & dp_sum$I_mm == 0 & dp_sum$dS_mm_fill < 0)
+dp_sum$D_min_mm[i] = 0
+dp_sum$D_mm[i] = 0
+dp_sum$D_max_mm[i] = 0
+```
+
+##### 6.7 collect final answers
+```{r, message = FALSE, warning = FALSE}
+
+final <- subset(dp_sum, select = c(Site, SiteNum, Date, year, Cover, P_mm, ET_mm, I_mm, dS_mm, dS_mm_fill, dS_mm_max, D_mm, D_min_mm, D_max_mm, D_mm_d, PCAPS1_mm, PCAPS2_mm))
+
+# check the change in soil moisture is reasonable for D_min scenario:
+final <- final %>%
+  group_by(Site) %>%
+  mutate(cum_dSmax = cumsum(dS_mm_max)) %>%
+  ungroup()
+
+rm(a, b, c, dp, e, et, i, p, pc, sm, tnf)
+
+# export results
+sp <- subset(final, select = c(Site, Date, P_mm, ET_mm, I_mm, dS_mm, dS_mm_fill, D_mm, D_min_mm, D_max_mm, PCAPS1_mm, PCAPS2_mm))
+p <- here::here("results", "Water_balance_output", "waterbalance_terms_6Dec2018.csv")
+write.csv(sp, p, row.names=FALSE)
+```
+
+
+#### 7) Plot results 
+
+##### 7.0 PCAPS drainage by month
+```{r, message = FALSE, warning = FALSE}
+
+# non-zero measurements
+a <- dp_sum %>% 
+  filter(PCAPS1_mm > 0 | PCAPS2_mm > 0) %>%
+  filter(I_mm == 0)
+
+hist(a$month, xlab = "month", main = "Non-zero PCAPS measurements")
+
+# mean and standard deviations of drainage rates
+b <- a[,c("month", "PCAPS1_mm_d")] 
+colnames(b) <- c("month", "PCAPS")
+c <- a[,c("month", "PCAPS2_mm_d")]
+colnames(c) <- c("month", "PCAPS")
+
+a <- rbind(b,c) %>% 
+  filter(!is.na(PCAPS)) %>% 
+  group_by(month) %>% 
+  summarise(m = mean(PCAPS), sd = sd(PCAPS))
+
+co = c("darkorchid1")
+ggplot(a, aes(x = month, y = m)) + 
+    geom_errorbar(aes(ymin = m - sd, ymax = m + sd), width=.2, color = co) +
+    geom_point(size = 2, color = co) +
+    theme_classic() +
+    geom_hline(yintercept = 0) +
+    scale_x_continuous(breaks = seq(1,12,1)) +
+    labs(y = "mean PCAPS (mm/d)") +
+    ggtitle("PCAPS drainage rate means (mm/d) +/- 1 sd") 
+
+```
+
+##### 7.1 PCAPS vs expected drainage during PCAPS sampling intervals
+
+```{r, message = FALSE, warning = FALSE}
+p <- final %>% 
+  group_by(SiteNum) %>%
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_col(aes(y = P_mm, fill = 'azure2')) + 
+      geom_line(aes(y = ET_mm, color = 'Evapotranspiration')) +
+      geom_line(aes(y = I_mm, color = 'Irrigation')) +
+      geom_line(aes(y = D_mm, color = 'L')) +
+      geom_line(aes(y = PCAPS1_mm, color = 'PC1')) +
+      geom_line(aes(y = PCAPS2_mm, color = 'PC2')) +
+      geom_line(aes(y = dS_mm_fill, color = 'S')) +
+      geom_line(aes(y = dS_mm, color = 'S2')) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste(.$Site, .$Cover, sep = "  ----  ")) +                       
+      scale_y_continuous(limits = c(-150, 350)) +
+      scale_fill_identity(name = '', guide = 'legend', labels = c('Precipitation')) +
+      scale_colour_manual(name = '', values = c('Evapotranspiration' = 'chartreuse4', 'Irrigation' = 'chartreuse2', 'L' = 'deepskyblue1', 'PC1' = 'mediumorchid1', 'PC2' = 'mediumorchid2', 'S' = 'darkorange', 'S2' = 'darkorange4'), labels = c('Evapotranspiration', 'Irrigation', 'Drainage', 'PCAPS1', 'PCAPS2', 'Change in soil moisture', 'Decagon probe data')) +
+      labs(x = "Year", y = "Flux (mm/sampling interval)")
+  )
+
+suppressWarnings(p$plots)
+```
+
+##### 7.1.2 drainage estimates with uncertainty
+```{r, message = FALSE, warning = FALSE}
+p <- final %>% 
+  group_by(SiteNum) %>%
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_col(aes(y = P_mm, fill = 'azure2')) + 
+      geom_ribbon(aes(ymin = D_min_mm, ymax = D_max_mm), fill = 'deepskyblue', alpha = 0.3) +
+      geom_line(aes(y = D_mm, color = 'D')) +
+      geom_line(aes(y = PCAPS1_mm, color = 'PC1')) +
+      geom_line(aes(y = PCAPS2_mm, color = 'PC2')) +
+      #geom_line(aes(y = bank, color = 'Z')) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste(.$Site, .$Cover, sep = "  ----  ")) +                        
+      scale_y_continuous(limits = c(0, 400)) +
+      scale_fill_identity(name = '', guide = 'legend', labels = c('Precipitation')) +
+      scale_colour_manual(name = '', values = c('D' = 'deepskyblue1', 'PC1' = 'mediumorchid1', 'PC2' = 'mediumorchid2'), labels = c('Drainage', 'PCAPS1', 'PCAPS2')) +
+      labs(x = "Year", y = "Flux (mm/sampling interval)")
+  )
+
+suppressWarnings(p$plots)
+```
+
+
+##### 7.2 PCAPS drainage as a fraction of precipitation
+```{r, message = FALSE, warning = FALSE}
+
+# calculate means by month, assuming independence among PCAPS (as done in WB write-up) 
+a <- dp_sum %>% 
+  filter(SiteNum < 8) %>% 
+  filter(P_mm > 0)
+
+a$pfrac <- a$PCAPS1_mm/a$P_mm
+
+b <- a %>% 
+  filter(!is.na(PCAPS2_mm)) %>%
+  mutate(pfrac = PCAPS2_mm/P_mm)
+
+b <- rbind(a,b) %>% 
+  mutate(Site = factor(SiteNum))
+
+c <- b %>% 
+  group_by(month) %>% 
+  filter(I_mm == 0) %>% 
+  summarise(pfrac = round(mean(pfrac, na.rm = TRUE), 2))
+
+# plot  time series
+co <- colors()[c(29,130,71,257,144,91,33,556,451,96,313)]
+
+p <- ggplot(b, aes(x = Date, y = pfrac, colour = Site)) +
+  geom_line() +
+  scale_colour_manual(values = co, drop = FALSE) +
+  scale_y_continuous(limits = c(0,1)) +
+  theme_classic() +
+  geom_hline(yintercept = 0) +
+  ggtitle(paste("PCAPS drainage as a fraction of precipitation")) +
+    labs(x = "Date", y = "Fraction [-]")
+plot(p)
+```
+
+##### 7.3 Section on seasonal rates, and PCAPS v water balance drainage, for WA Hydrogeo symposium abstract
+```{r}
+# estimate seasonal drainage, averaged first across each site
+pcaps_sum <- dp_sum %>%
+  select(SiteNum, Date, days, P_mm, I_mm, PCAPS1_mm, PCAPS2_mm, PCAPS1_mm_d, PCAPS2_mm_d, D_mm, D_min_mm, D_max_mm) %>%
+  filter(SiteNum < 8) %>%
+  #filter(P_mm > 0) %>%
+  mutate(month = month(Date), year = year(Date), pavg = rowMeans(select(., c(PCAPS1_mm, PCAPS2_mm)), na.rm = TRUE)) %>%
+  mutate(pr = pavg/days, dr = D_mm/days, dif = (D_mm - pavg)/days) 
+
+# ------ summary of drainage rates --------
+
+# create season variable
+pcaps_sum$season = 1
+pcaps_sum$season[pcaps_sum$month > 2] = 2
+pcaps_sum$season[pcaps_sum$month > 5] = 3
+pcaps_sum$season[pcaps_sum$month > 8] = 4
+pcaps_sum$season[pcaps_sum$month > 11] = 1
+
+# overall summary, all data
+a <- pcaps_sum %>%
+  summarise(meanpr = mean(pr, na.rm = TRUE), medpr = median(pr, na.rm = TRUE), maxp1 = max(PCAPS1_mm_d, na.rm = TRUE), maxpr2 = max(PCAPS2_mm_d, na.rm = TRUE), meandr = mean(dr, na.rm = TRUE), mediandr = mean(dr, na.rm = TRUE), meandif = mean(abs(dif), na.rm = TRUE), stdif = sd(dif, na.rm = TRUE))
+
+# seasonal summary
+b <- pcaps_sum %>%
+  group_by(season) %>%
+  summarise(meanpr = mean(pr, na.rm = TRUE), medpr = median(pr, na.rm = TRUE), maxp1 = max(PCAPS1_mm_d, na.rm = TRUE), maxpr2 = max(PCAPS2_mm_d, na.rm = TRUE), meandr = mean(dr, na.rm = TRUE), meandif = mean(dif, na.rm = TRUE), stdif = sd(dif, na.rm = TRUE))
+  
+# irrigated periods
+irr <- pcaps_sum %>%
+  filter(I_mm > 0) %>%
+  #group_by(month) %>%
+  summarise(meanpr = mean(pr, na.rm = TRUE), medpr = median(pr, na.rm = TRUE), maxp1 = max(PCAPS1_mm_d, na.rm = TRUE), maxpr2 = max(PCAPS2_mm_d, na.rm = TRUE))
+
+# non-irrigated periods
+noirr <- pcaps_sum %>%
+  filter(I_mm == 0) %>%
+  group_by(month) %>%
+  summarise(meanpr = mean(pr, na.rm = TRUE), medpr = median(pr, na.rm = TRUE), maxp1 = max(PCAPS1_mm_d, na.rm = TRUE), maxpr2 = max(PCAPS2_mm_d, na.rm = TRUE))
+
+# ----- compare pcaps with water balance --
+cor(x = pcaps_sum$pavg, y = pcaps_sum$D_mm, use = "complete.obs")
+ggplot(pcaps_sum, aes(pr, D_mm, color = season)) +
+  geom_point()
+         
+
+```
+
+
+##### 7.4 Daily precip, soil moisture and PCAPS sampling date for each field
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+# get PCAPS sampling dates
+pc <- lea[, c(2,5,3,4)]
+# indicator for measurement
+pc$meas <- 1
+names(pc) <- c("Date", "SiteNum", "PCAPS1_mm", "PCAPS2_mm", "PCAPS_sample")
+dtmp <- left_join(data, pc) %>% filter(!is.na(Date))
+
+plot_dly <- dtmp %>%
+  filter(SiteNum %in% c(16)) %>%
+  group_by(SiteNum) %>%
+  #filter(PCAPS_sample == 1) %>% 
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_col(aes(y = ppt_mm, fill = 'royalblue1')) + 
+      geom_point(aes(y = PCAPS_sample*0, color = 'PCAPS'), shape = 21) +
+      geom_point(aes(y = soil_moisture*100, color = 'Soil moisture'), shape = 21) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste(.$SiteName, .$Cover, sep = "  ----  ")) +
+      scale_y_continuous(limits = c(0, 65)) +
+      scale_fill_identity(name = '', guide = 'legend', labels = c('Precipitation')) +
+      scale_colour_manual(name = '', values = c( 'PCAPS' = 'magenta', 'Soil moisture' = 'darkorange'), labels = c( 'PCAPS sampled', 'Soil moisture')) +
+      labs(x = "Year", y = "Rate (mm/day) | OR | Soil moisture [%]")
+  )
+
+suppressWarnings(plot_dly$plots)
+
+```
+
+##### 7.5.0 Decagon soil moisture data comparison
+
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+co <- colors()[c(29,130,71,257,144,91,33,556,451,96,313,52,78,103)]
+
+p <- ggplot(datasum, aes(x = Date, y = soil_moisture, colour = SiteName)) +
+  geom_line() +
+  scale_colour_manual(values = co, drop = FALSE) +
+  theme_classic() +
+  geom_hline(yintercept = 0) +
+  ggtitle(paste("Decagon soil moisture measurements (at 1m) across PINE sites")) +
+    labs(x = "Date", y = "Soil moisture [-]")
+plot(p)
+
+p <- ggplot(dsm2 %>% filter(SiteNum %in% c(5,7,10,13,15)), aes(x = Date, y = PINE_sm, colour = SiteName)) +
+  geom_line() +
+  scale_colour_manual(values = co, drop = FALSE) +
+  theme_classic() +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(limits = c(-0.06, 0.06)) +
+  ggtitle(paste("Change in soil moisture measurements (at 1m) across well-correlated PINE sites")) +
+    labs(x = "Date", y = "Change in soil moisture [-]")
+plot(p)
+
+p <- ggplot(dsm2, aes(x = Date, y = PINE_sm, colour = SiteName)) +
+  geom_line() +
+  scale_colour_manual(values = co, drop = FALSE) +
+  theme_classic() +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(limits = c(-0.06, 0.06)) +
+  ggtitle(paste("Change in soil moisture measurements (at 1m) across all PINE sites")) +
+    labs(x = "Date", y = "Change in soil moisture [-]")
+plot(p)
+
+```
+
+##### 7.6 PINE vs TNF change in soil moisture, both at 1m 
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+yr = 2015
+p <- dsm2 %>% 
+  group_by(SiteNum) %>%
+  #filter(year(Date) == yr) %>% 
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_line(aes(y = N100sm, color = 'Ndeep')) +
+      geom_line(aes(y = PINE_sm, color = 'PINE')) +
+      geom_line(aes(y = S100sm, color = 'Sdeep')) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(.$SiteName) + 
+      scale_x_date(date_breaks = "6 month", date_labels =  "%m/%Y", limits = as.Date(c('2014-10-01','2017-12-31')), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(-0.3, 0.3)) +
+      scale_colour_manual(name = '', values = c('Ndeep' = 'darkorchid4','PINE' = 'darkorange','Sdeep' = 'cyan4'), labels = c('North TNF plot: 1m','PINE site', 'South TNF plot: 1m')) +
+      labs(x = "Year", y = "Change in soil moisture [-]")
+  )
+
+suppressWarnings(p$plots)
+
+```
+
+##### 7.7 PINE vs TNF change in soil moisture over full 1m profile 
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+p <- dsm2 %>% 
+  group_by(SiteNum) %>%
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_line(aes(y = N_sm, color = 'N')) +
+      geom_line(aes(y = PINE_sm, color = 'PINE')) +
+      geom_line(aes(y = S_sm, color = 'S')) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste0(.$SiteName)) + 
+      scale_x_date(date_breaks = "6 month", date_labels =  "%m/%Y", limits = as.Date(c('2014-10-01','2017-12-31')), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(-0.3,0.3)) +
+      scale_colour_manual(name = '', values = c('N' = 'darkorchid2', 'PINE' = 'darkorange','S' = 'cyan2'), labels = c('North TNF','PINE site', 'South TNF')) +
+      labs(x = "Year", y = "Change in soil moisture [-]")
+  )
+
+suppressWarnings(p$plots)
+
+```
+
+##### 7.8 PINE vs TNF absolute soil moisture at 1m (each series scaled to its max value for comparison)
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+p <- sm2 %>% 
+  group_by(SiteNum) %>%
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_line(aes(y = N100sm/max(N100sm, na.rm = TRUE), color = 'north')) +
+      geom_line(aes(y = PINE_sm/max(PINE_sm, na.rm = TRUE), color = 'PINE')) +
+      geom_line(aes(y = S100sm/max(S100sm, na.rm = TRUE), color = 'south')) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste0(.$SiteName)) + 
+      scale_x_date(date_breaks = "12 month", date_labels =  "%Y", limits = as.Date(c('2013-01-01','2017-12-31')), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0,1)) +
+      scale_colour_manual(name = '', values = c('north' = 'darkorchid1', 'PINE' = 'darkorange','south' = 'darkorchid4'), labels = c('North TNF plot', 'PINE site', 'South TNF plot')) +
+      labs(x = "Year", y = "Soil moisture [-]")
+  )
+
+suppressWarnings(p$plots)
+```
+
+##### 7.9 PINE change in soil moisture vs P - ET 
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+p <- dp_sum %>% 
+  group_by(SiteNum) %>%
+  do(
+    plots = ggplot(data = .) + aes(x = (P_mm - ET_mm), y = dS_mm) +
+      geom_point() +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste0(.$Site)) +  
+      labs(x = "P - ET (mm)", y = "change in soil moisture ([-])mm)")
+  )
+
+suppressWarnings(p$plots)
+```
+
+##### 7.9.1 Precipitation compared to normals
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+# PRISM
+p <- here::here("data", "Other", "PRISM_30yr_normals_summary.csv")
+pnorm <- read.csv(p, header = TRUE, skip = 1, stringsAsFactors = FALSE)
+pnorm$month <- as.numeric(pnorm$month)
+names(pnorm) <- c("month", "pnorm")
+pnorm <- left_join(prcp_sum, pnorm)
+pnorm$date <- as.Date(paste(pnorm$year, pnorm$month, "1", sep = "-"))
+
+# plot PRISM
+p <- ggplot(pnorm, aes(x = date)) +
+  geom_line(aes(y = ppt_mm, color = 'A')) +
+  geom_line(aes(y = pnorm, color = 'B')) +           
+  theme_classic() +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(limits = c(0, 550)) +
+  scale_colour_manual(name = '', values = c('A' = 'royalblue1', 'B' = 'darkorchid1'), labels = c('monthly data', '30-yr normal for month')) +
+  ggtitle("Precipitation during study period compared with 30-yr normals (PRISM)") +
+  labs(x = "Date", y = "Precipitation (mm)")
+plot(p)
+
+a <- pnorm %>% group_by(year) %>% summarise(ppt_yr = sum(ppt_mm), ppt_norm = sum(pnorm), ppt_ratio = ppt_yr/ppt_norm)
+```
+
+##### 7.9.2 Groundwater levels
+```{r, message = FALSE, warning = FALSE, eval = FALSE}
+
+p <- ggplot(gw, aes(x = Date, y = (DTW_ft * 0.3048), color = Well)) + 
+  geom_line() +
+  theme_classic() +
+  labs(x = "Date", y = "Depth to water (m)") + 
+  ggtitle("Depth to groundwater among all wells")
+
+plot(p)
+
+gwp <- left_join(prcp, gw)
+
+p <- gwp %>% 
+  filter(SiteNum %in% c(1,10,11,12,14)) %>%
+  group_by(SiteNum) %>%
+  do(
+    plots = ggplot(data = .) + aes(Date) +
+      geom_col(aes(y = ppt_mm, fill = 'azure2')) +
+      geom_point(aes(y = DTW_ft*10*0.3048, color = 'A')) +
+      scale_y_continuous(sec.axis = sec_axis(~./10, name = "Depth to water (m)")) +
+      geom_hline(yintercept = 0) +
+      theme_classic() +
+      ggtitle(paste0("GW-",.$SiteNum)) + 
+      scale_x_date(date_breaks = "12 month", date_labels =  "%Y", limits = as.Date(c('2013-01-01','2017-12-31')), expand = c(0, 0)) +
+      scale_fill_identity(name = '', guide = 'legend', labels = c('Precipitation')) +
+      scale_colour_manual(name = '', values = c('A' = 'navy'), labels = c('groundwater depth')) +
+      labs(x = "Year", y = "Precipitation rate (mm/day)")
+  )
+
+suppressWarnings(p$plots)
+
+```
+
+##### 8) Map sites
+```{r}
+p <- here::here("data", "Other", "coordinates.csv")
+d <- read.csv(p, fill = TRUE, stringsAsFactors = FALSE)
+data <- tibble(lat = d$lat, lon = d$lon, site = d$site)
+
+leaflet(data, width = "60%", options = leafletOptions(zoomControl = FALSE)) %>% 
+  addProviderTiles("Esri.NatGeoWorldMap") %>%
+  addMarkers(~lon, ~lat, popup = ~as.character(site), label = ~as.character(site)) %>%
+  addScaleBar()
+
+```
