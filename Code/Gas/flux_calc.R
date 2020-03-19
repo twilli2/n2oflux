@@ -411,9 +411,9 @@ f<- f[-1,]
 f$chamber<- as.character(f$chamber)
 f <- rename(f, field = Field, plot = plot, vol = "Vol (L)", area = "A (m^2)", temp = "Temp K", soil_temp = "Temp C__1",atm = "(atm)")
 f$field <- as.character(f$field) 
-#f <- filter(f, field != 1) 
 f$soil_temp <- as.numeric(f$soil_temp)
 flux <- bind_rows(flux,f)
+
 flux$season <- 1
 flux <- bind_rows(flux,flux2)
 rm(f,flux2)
@@ -437,9 +437,10 @@ s$field <- as.character(s$field)
 s$plot <- as.character(s$plot)
 s$chamber <- as.character(s$chamber)
 
-p <- left_join(s,flux)
+p <- left_join(flux,s)
 p <- mutate(p,co2_flux = ((co2_slope*vol*atm*(12.011)*(60)*(1*10^-6))/(temp*area*(0.08206))))
 p <- mutate(p,n2o_flux = ((n2o_slope*vol*atm*(28.0134)*(60)*(1*10^3))/(temp*(area*10000)*(0.08206))))
+##calcs checked by JM 022620
 p$plot[p$plot == "N0"] <- "0"
 p$plot[p$plot == "N25"] <- "25"
 p$plot[p$plot == "N50"] <- "50"

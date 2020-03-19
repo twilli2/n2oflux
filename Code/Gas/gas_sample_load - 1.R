@@ -19,7 +19,7 @@ x <- x %>%
   replace_with_na_at(.vars = c("co2"), condition = ~ (.x) <= 300)
 
 x <- x[-which(is.na(x$n2o)),]
-
+#check for greater than 4 time points = error in sheet
 x %>%  
   group_by(field, plot, chamber) %>%
   tally() %>% 
